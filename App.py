@@ -2,7 +2,7 @@ import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 import re
 
 # ------------------------------
@@ -12,22 +12,17 @@ st.set_page_config(page_title="Registro de Paletes", layout="centered")
 st.title("🍱 Entrada de Paletes - Câmaras Frias")
 
 # ------------------------------
-# Conexão com Google Sheets
+# Conexão com Google Sheets (sempre atualizada)
 # ------------------------------
 def conectar_planilha():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    # As credenciais vêm dos st.secrets (configuradas no Streamlit Cloud)
     creds_dict = st.secrets["gcp_service_account"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    # Abre a planilha pelo ID (extraído da URL)
     sheet_id = "1HoN-VLyO5y9wJ4NKdpz42-BljRzT4VeJVY-Wio4CO6g"
     sheet = client.open_by_key(sheet_id).sheet1
     return sheet
 
-# ------------------------------
-# Funções auxiliares
-# ------------------------------
 def carregar_dados_existentes(sheet):
     """Retorna um DataFrame com todos os registros da planilha"""
     dados = sheet.get_all_records()
@@ -38,17 +33,6 @@ def combina_existe(camara, vaga, df_existente):
     if df_existente.empty:
         return False
     return ((df_existente['camara'] == camara) & (df_existente['camara-vaga'] == vaga)).any()
-
-def validar_validade(data_str):
-    """Valida formato dd/mm/aaaa e se a data é real"""
-    padrao = r'^\d{2}/\d{2}/\d{4}$'
-    if not re.match(padrao, data_str):
-        return False
-    try:
-        datetime.strptime(data_str, '%d/%m/%Y')
-        return True
-    except ValueError:
-        return False
 
 def salvar_registros(sheet, registros):
     """Adiciona uma lista de registros (cada registro é um dicionário) na planilha"""
@@ -73,13 +57,9 @@ if 'vaga' not in st.session_state:
 if 'bloqueado' not in st.session_state:
     st.session_state.bloqueado = False
 
-# Conectar e carregar dados existentes (para validação)
-try:
-    sheet = conectar_planilha()
-    df_existente = carregar_dados_existentes(sheet)
-except Exception as e:
-    st.error(f"Erro ao conectar com a planilha: {e}")
-    st.stop()
+# Conectar e carregar dados existentes (sempre atualizado)
+sheet = conectar_planilha()
+df_existente = carregar_dados_existentes(sheet)
 
 # ------------------------------
 # 1. Seleção da câmara e vaga
@@ -117,7 +97,7 @@ if camara_selecionada and vaga_selecionada:
 # ------------------------------
 if not st.session_state.bloqueado and st.session_state.camara and st.session_state.vaga:
     st.subheader("📦 Produtos no Palete")
-    
+
     with st.form(key="produto_form", clear_on_submit=True):
         marca_opcoes = [
             "Seara", "Seara | Doriana", "Seara | Primor", "Seara | Excelsior",
@@ -127,32 +107,41 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
         ]
         marca = st.selectbox("Produto / Marca", marca_opcoes)
         descricao = st.text_input("Descrição do produto (ex.: Peito de frango, 1kg)")
-        validade = st.text_input("Validade (dd/mm/aaaa)")
+        
+        # Campo de validade com calendário (sem necessidade de digitar "/")
+        data_validade = st.date_input(
+            "Validade", 
+            value=None, 
+            format="DD/MM/YYYY",
+            help="Selecione a data no calendário"
+        )
         
         adicionado = st.form_submit_button("➕ Adicionar este produto")
-        
+
         if adicionado:
-            if not validar_validade(validade):
-                st.error("Data inválida. Use o formato dd/mm/aaaa e uma data real.")
+            if data_validade is None:
+                st.error("Por favor, selecione a data de validade.")
             elif not descricao.strip():
                 st.error("Por favor, informe a descrição do produto.")
             else:
+                # Converte a data para string no formato dd/mm/aaaa
+                validade_str = data_validade.strftime("%d/%m/%Y")
                 st.session_state.produtos_temp.append({
                     "produto-marca": marca,
                     "produto-descricao": descricao,
-                    "validade": validade
+                    "validade": validade_str
                 })
                 st.success(f"Produto '{marca}' adicionado! Total: {len(st.session_state.produtos_temp)}")
-    
+
     # Exibir lista de produtos já adicionados
     if st.session_state.produtos_temp:
         st.write("**Produtos neste palete:**")
         for i, p in enumerate(st.session_state.produtos_temp, 1):
             st.write(f"{i}. {p['produto-marca']} - {p['produto-descricao']} (val.: {p['validade']})")
-        
-        # Botão finalizar
-        if st.button("✅ Finalizar registro deste palete"):
-            # Confirmação: adicionar mais produtos?
+
+        # Botão para enviar os dados para a planilha
+        if st.button("✅ Enviar dados para a planilha"):
+            # Confirmação se deseja adicionar mais produtos
             confirmar = st.radio(
                 "Deseja adicionar mais produtos para esta mesma câmara/vaga?",
                 ("Sim, adicionar mais", "Não, finalizar e enviar")
@@ -172,10 +161,11 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                 try:
                     salvar_registros(sheet, registros_para_gravar)
                     st.success(f"✅ {len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
-                    # Limpar sessão para novo palete
+                    # Limpar todos os campos do formulário
                     st.session_state.produtos_temp = []
                     st.session_state.camara = None
                     st.session_state.vaga = None
+                    st.session_state.bloqueado = False
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao salvar: {e}")
