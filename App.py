@@ -192,7 +192,7 @@ if st.session_state.exibir_gerenciamento and camara_selecionada != "Selecione a 
                 with st.spinner("Excluindo registros..."):
                     num_excluidos = excluir_registros_vaga(sheet, camara_selecionada, vaga_selecionada)
                 if num_excluidos > 0:
-                    st.success(f"{num_excluidos} registro(s) excluído(s) com sucesso! A vaga agora está livre.")
+                    st.toast(f"{num_excluidos} registro(s) excluído(s) com sucesso! A vaga agora está livre.", duration=3000)
                     df_existente = carregar_dados_existentes(sheet)
                     st.session_state.bloqueado = False
                     st.session_state.camara = camara_selecionada
@@ -265,7 +265,7 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                     })
                 try:
                     salvar_registros(sheet, registros_para_gravar)
-                    st.success(f"{len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
+                    st.toast(f"{len(registros_para_gravar)} produto(s) registrado(s) com sucesso!", duration=3000)
                     st.session_state.produtos_temp = []
                     st.session_state.camara = None
                     st.session_state.vaga = None
