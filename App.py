@@ -58,6 +58,23 @@ def salvar_registros(sheet, registros):
             reg['validade']
         ])
 
+def excluir_registros_vaga(sheet, camara, vaga):
+    """Exclui todas as linhas da planilha que correspondem à câmara e vaga informadas.
+    Retorna o número de registros excluídos."""
+    all_values = sheet.get_all_values()
+    if not all_values:
+        return 0
+    # Cabeçalho na primeira linha (índice 0)
+    # As linhas de dados começam no índice 1 (linha 2 da planilha)
+    rows_to_delete = []
+    for i, row in enumerate(all_values[1:], start=2):  # start=2 porque a primeira linha de dados é a linha 2
+        if len(row) >= 2 and row[0] == camara and row[1] == vaga:
+            rows_to_delete.append(i)
+    # Deletar de trás para frente para não alterar os índices
+    for row_num in sorted(rows_to_delete, reverse=True):
+        sheet.delete_rows(row_num)
+    return len(rows_to_delete)
+
 # ------------------------------
 # Gerenciamento de reset via query_params
 # ------------------------------
@@ -83,6 +100,9 @@ if 'vaga' not in st.session_state:
     st.session_state.vaga = None
 if 'bloqueado' not in st.session_state:
     st.session_state.bloqueado = False
+# Estado para controlar a exibição da seção de gerenciamento de vaga ocupada
+if 'exibir_gerenciamento' not in st.session_state:
+    st.session_state.exibir_gerenciamento = False
 
 # Carregar dados
 sheet = conectar_planilha()
@@ -112,21 +132,64 @@ vaga_opts = ["Selecione a vaga"] + vagas
 camara_selecionada = st.selectbox("Câmara", camara_opts, index=0, key=f"camara_{reset_token}")
 vaga_selecionada = st.selectbox("Vaga", vaga_opts, index=0, key=f"vaga_{reset_token}")
 
+# Verifica se a combinação já existe
 if camara_selecionada != "Selecione a câmara" and vaga_selecionada != "Selecione a vaga":
     if combina_existe(camara_selecionada, vaga_selecionada, df_existente):
-        st.error(f"⚠️ A combinação {camara_selecionada} / {vaga_selecionada} já está sendo usada. Escolha outra vaga.")
+        st.error(f"⚠️ A combinação {camara_selecionada} / {vaga_selecionada} já está sendo usada.")
         st.session_state.bloqueado = True
         st.session_state.camara = None
         st.session_state.vaga = None
+        st.session_state.exibir_gerenciamento = True
     else:
         st.success("Vaga disponível!")
         st.session_state.bloqueado = False
         st.session_state.camara = camara_selecionada
         st.session_state.vaga = vaga_selecionada
+        st.session_state.exibir_gerenciamento = False
 else:
     st.session_state.bloqueado = False
     st.session_state.camara = None
     st.session_state.vaga = None
+    st.session_state.exibir_gerenciamento = False
+
+# ------------------------------
+# 1.1 Gerenciamento de vaga ocupada (ver registros e excluir)
+# ------------------------------
+if st.session_state.exibir_gerenciamento and camara_selecionada != "Selecione a câmara" and vaga_selecionada != "Selecione a vaga":
+    with st.expander("🔍 Gerenciar vaga ocupada", expanded=True):
+        # Filtrar os registros existentes para esta combinação
+        df_filtrado = df_existente[
+            (df_existente['camara'] == camara_selecionada) &
+            (df_existente['camara-vaga'] == vaga_selecionada)
+        ]
+        st.write(f"**Registros encontrados para {camara_selecionada} / {vaga_selecionada}:**")
+        if not df_filtrado.empty:
+            st.dataframe(df_filtrado[['produto-marca', 'produto-descricao', 'validade']], use_container_width=True)
+        else:
+            st.info("Nenhum registro detalhado encontrado (inconsistência de dados).")
+        
+        st.divider()
+        st.warning("⚠️ **Ação irreversível:** Excluir todos os registros desta vaga.")
+        col_confirm1, col_confirm2 = st.columns(2)
+        with col_confirm1:
+            confirmar_exclusao = st.checkbox("✅ Confirmar exclusão de todos os registros desta vaga")
+        with col_confirm2:
+            if st.button("🗑️ Excluir todos os registros", type="primary", disabled=not confirmar_exclusao):
+                with st.spinner("Excluindo registros..."):
+                    num_excluidos = excluir_registros_vaga(sheet, camara_selecionada, vaga_selecionada)
+                if num_excluidos > 0:
+                    st.success(f"{num_excluidos} registro(s) excluído(s) com sucesso! A vaga agora está livre.")
+                    # Recarregar dados e resetar estados
+                    df_existente = carregar_dados_existentes(sheet)
+                    st.session_state.bloqueado = False
+                    st.session_state.camara = camara_selecionada
+                    st.session_state.vaga = vaga_selecionada
+                    st.session_state.exibir_gerenciamento = False
+                    st.session_state.produtos_temp = []  # Limpar lista de produtos temporários
+                    force_reset()
+                else:
+                    st.error("Nenhum registro foi excluído. Verifique se a combinação realmente existe.")
+        st.info("💡 Após excluir, a vaga ficará livre para novo cadastro.")
 
 # ------------------------------
 # 2. Adicionar produtos (se vaga disponível)
@@ -209,5 +272,5 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                 st.session_state.bloqueado = False
                 force_reset()
 else:
-    if st.session_state.bloqueado:
+    if st.session_state.bloqueado and not st.session_state.exibir_gerenciamento:
         st.info("🔁 Altere a câmara ou vaga para uma combinação livre.")
