@@ -12,7 +12,7 @@ st.set_page_config(page_title="Registro de Paletes", layout="centered")
 st.title("❄️ Entrada de Paletes | Perecíveis")
 
 # ------------------------------
-# CSS + JavaScript: rolagem suave e dropdown para cima
+# CSS + JavaScript: rolagem inteligente para Android
 # ------------------------------
 st.markdown("""
 <style>
@@ -40,22 +40,74 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // ---------- ROLAGEM SUAVE AO FOCO ----------
-    function scrollToFocusedElement(element) {
+    // ---------- ROLAGEM INTELIGENTE PARA O PRÓXIMO CAMPO (ANDROID) ----------
+    function scrollToElement(element, offset = 80) {
+        if (!element) return;
+        // Usa scrollIntoView com alinhamento suave e bloqueio no início
+        element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+            inline: 'nearest'
+        });
+        // Ajuste fino para compensar cabeçalhos fixos ou barra superior
         setTimeout(() => {
             const rect = element.getBoundingClientRect();
-            const viewportHeight = window.innerHeight;
-            const keyboardEstimate = viewportHeight * 0.4;
-            if (rect.bottom > viewportHeight - keyboardEstimate) {
-                window.scrollTo({
-                    top: rect.top + window.scrollY - 80,
-                    behavior: "smooth"
-                });
-            }
-        }, 250);
+            const currentScroll = window.scrollY;
+            const targetScroll = currentScroll + rect.top - offset;
+            window.scrollTo({ top: targetScroll, behavior: 'smooth' });
+        }, 100);
     }
 
-    // ---------- REPOSICIONAR DROPDOWN PARA CIMA ----------
+    function getNextFocusableElement(currentElement) {
+        // Seleciona todos os campos de entrada, selects, textareas, datepickers e comboboxes
+        const focusableSelectors = [
+            'input:not([type="hidden"])', 'select', 'textarea',
+            '[role="combobox"]', '[data-testid="stSelectbox"]',
+            '[data-testid="stDateInput"] input', '[data-testid="stTextInput"] input',
+            '[contenteditable="true"]'
+        ];
+        const focusableElements = Array.from(document.querySelectorAll(focusableSelectors.join(',')))
+            .filter(el => el.offsetParent !== null); // apenas visíveis
+        
+        const currentIndex = focusableElements.indexOf(currentElement);
+        if (currentIndex !== -1 && currentIndex + 1 < focusableElements.length) {
+            return focusableElements[currentIndex + 1];
+        }
+        return null;
+    }
+
+    // Função principal: ao preencher/perder foco, exibe o próximo campo
+    function onFieldInteraction(event) {
+        const target = event.target;
+        // Aguarda o término da interação (ex: após digitar ou ao sair do campo)
+        setTimeout(() => {
+            // Se o campo perdeu foco (blur) ou se o usuário pressionou Enter/Next
+            const nextField = getNextFocusableElement(target);
+            if (nextField) {
+                scrollToElement(nextField, 100);
+            } else {
+                // Se não há próximo campo, mantém o atual visível
+                scrollToElement(target, 80);
+            }
+        }, 150);
+    }
+
+    function onKeydownHandler(event) {
+        // Detecta tecla Enter ou "Next" (código 9 = Tab, 13 = Enter)
+        if (event.key === 'Enter' || event.key === 'Tab') {
+            // Pequeno delay para permitir a mudança de foco natural
+            setTimeout(() => {
+                const active = document.activeElement;
+                if (active) {
+                    const next = getNextFocusableElement(active);
+                    if (next) scrollToElement(next, 100);
+                    else scrollToElement(active, 80);
+                }
+            }, 50);
+        }
+    }
+
+    // ---------- AJUSTE PARA DROPDOWN (mantido do original) ----------
     function adjustDropdownPosition(selectElement) {
         let dropdown = selectElement.nextElementSibling;
         if (!dropdown || !dropdown.matches('[role="listbox"], .st-bq, .st-br, [data-testid="stSelectboxDropdown"]')) {
@@ -90,33 +142,48 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // Aplica para selects e datepickers
-    const selectors = ['[data-testid="stSelectbox"]', '[data-testid="stDateInput"]', '[role="combobox"]'];
-    function addDropdownBehavior() {
-        document.querySelectorAll(selectors.join(',')).forEach(setupSelectBehavior);
+    // ---------- REGISTRA EVENTOS EM TODOS OS CAMPOS ----------
+    function attachFieldBehaviors() {
+        const focusableSelectors = [
+            'input:not([type="hidden"])', 'select', 'textarea',
+            '[role="combobox"]', '[data-testid="stSelectbox"]',
+            '[data-testid="stDateInput"] input', '[data-testid="stTextInput"] input'
+        ];
+        const fields = document.querySelectorAll(focusableSelectors.join(','));
+        
+        fields.forEach(field => {
+            if (!field.hasAttribute('data-scroll-enhanced')) {
+                field.setAttribute('data-scroll-enhanced', 'true');
+                // Evento blur: ao sair do campo, rola para o próximo
+                field.addEventListener('blur', onFieldInteraction);
+                // Evento keydown para Enter/Tab
+                field.addEventListener('keydown', onKeydownHandler);
+                // Para selects e comboboxes, também ajusta dropdown
+                if (field.matches('select, [role="combobox"], [data-testid="stSelectbox"]')) {
+                    setupSelectBehavior(field);
+                }
+            }
+        });
     }
-    addDropdownBehavior();
-    const observer = new MutationObserver(addDropdownBehavior);
+
+    // Executa inicial e observa mudanças no DOM (Streamlit recarrega partes)
+    attachFieldBehaviors();
+    const observer = new MutationObserver(() => attachFieldBehaviors());
     observer.observe(document.body, { childList: true, subtree: true });
 
-    // Rolagem suave para todos os campos focáveis
-    const focusableSelectors = [
-        'input', 'select', 'textarea',
-        '[class*="st-b6"]', '[class*="st-b7"]',
-        '[role="combobox"]', '[data-testid="stSelectbox"]',
-        '[data-testid="stDateInput"]', '[data-testid="stTextInput"]'
-    ];
-    function addScrollListener(el) {
-        if (!el.hasAttribute('data-scroll-listener')) {
-            el.setAttribute('data-scroll-listener', 'true');
-            el.addEventListener('focus', (e) => scrollToFocusedElement(e.target));
+    // Ajuste extra para quando o teclado virtual abre/fecha (viewport resize)
+    let lastViewportHeight = window.innerHeight;
+    window.addEventListener('resize', () => {
+        const newHeight = window.innerHeight;
+        const activeElement = document.activeElement;
+        if (activeElement && newHeight !== lastViewportHeight) {
+            // Teclado abriu ou fechou: rola suavemente para o campo ativo
+            setTimeout(() => {
+                scrollToElement(activeElement, 80);
+            }, 50);
         }
-    }
-    document.querySelectorAll(focusableSelectors.join(',')).forEach(addScrollListener);
-    const scrollObserver = new MutationObserver(() => {
-        document.querySelectorAll(focusableSelectors.join(',')).forEach(addScrollListener);
+        lastViewportHeight = newHeight;
     });
-    scrollObserver.observe(document.body, { childList: true, subtree: true });
 });
 </script>
 """, unsafe_allow_html=True)
@@ -260,7 +327,6 @@ if st.session_state.exibir_gerenciamento and camara_selecionada != "Selecione a 
         ]
         st.write(f"**Registros encontrados para {camara_selecionada} / {vaga_selecionada}:**")
         if not df_filtrado.empty:
-            # Exibe também a coluna 'registro'
             st.dataframe(df_filtrado[['registro', 'produto-marca', 'produto-descricao', 'validade']], use_container_width=True)
         else:
             st.info("Nenhum registro detalhado encontrado (inconsistência de dados).")
