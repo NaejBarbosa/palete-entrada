@@ -4,7 +4,8 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from datetime import datetime
 import pytz
-import time  # necessário para o delay antes do reset
+import time
+import uuid
 
 # ------------------------------
 # Configuração da página
@@ -39,6 +40,69 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
 }
 </style>
 """, unsafe_allow_html=True)
+
+# ------------------------------
+# Função para mensagem centralizada com animação
+# ------------------------------
+def exibir_mensagem_centralizada(mensagem, tipo="success"):
+    """
+    Exibe uma mensagem flutuante no centro da tela com animação de subir e desaparecer.
+    tipo: "success", "error", "warning", "info"
+    """
+    cores = {
+        "success": "#28a745",
+        "error": "#dc3545",
+        "warning": "#ffc107",
+        "info": "#17a2b8"
+    }
+    cor_fundo = cores.get(tipo, "#28a745")
+    cor_texto = "#ffffff" if tipo != "warning" else "#212529"
+    
+    # ID único para evitar conflitos
+    msg_id = f"msg_{uuid.uuid4().hex}"
+    
+    html = f"""
+    <div id="{msg_id}" style="
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: {cor_fundo};
+        color: {cor_texto};
+        padding: 16px 32px;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        font-weight: bold;
+        font-size: 1.2rem;
+        z-index: 9999;
+        text-align: center;
+        white-space: nowrap;
+        font-family: system-ui, -apple-system, sans-serif;
+        animation: fadeOutUp 0.5s ease-in-out 2.5s forwards;
+    ">
+        {mensagem}
+    </div>
+    <style>
+        @keyframes fadeOutUp {{
+            0% {{
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }}
+            100% {{
+                opacity: 0;
+                transform: translate(-50%, -80%);
+                visibility: hidden;
+            }}
+        }}
+    </style>
+    <script>
+        setTimeout(function() {{
+            var el = document.getElementById("{msg_id}");
+            if (el) el.remove();
+        }}, 3000);
+    </script>
+    """
+    st.markdown(html, unsafe_allow_html=True)
 
 # ------------------------------
 # Conexão com Google Sheets
@@ -193,9 +257,8 @@ if st.session_state.exibir_gerenciamento and camara_selecionada != "Selecione a 
                 with st.spinner("Excluindo registros..."):
                     num_excluidos = excluir_registros_vaga(sheet, camara_selecionada, vaga_selecionada)
                 if num_excluidos > 0:
-                    # Mensagem suave com duração de 3 segundos antes do reset
-                    st.toast(f"{num_excluidos} registro(s) excluído(s) com sucesso! A vaga agora está livre.", duration=3000)
-                    time.sleep(3)  # Aguarda a mensagem desaparecer naturalmente
+                    exibir_mensagem_centralizada(f"{num_excluidos} registro(s) excluído(s) com sucesso! A vaga agora está livre.", tipo="success")
+                    time.sleep(3)
                     df_existente = carregar_dados_existentes(sheet)
                     st.session_state.bloqueado = False
                     st.session_state.camara = camara_selecionada
@@ -268,9 +331,8 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                     })
                 try:
                     salvar_registros(sheet, registros_para_gravar)
-                    # Mensagem suave com duração de 3 segundos antes do reset
-                    st.toast(f"{len(registros_para_gravar)} produto(s) registrado(s) com sucesso!", duration=3000)
-                    time.sleep(3)  # Aguarda a mensagem desaparecer naturalmente
+                    exibir_mensagem_centralizada(f"{len(registros_para_gravar)} produto(s) registrado(s) com sucesso!", tipo="success")
+                    time.sleep(3)
                     st.session_state.produtos_temp = []
                     st.session_state.camara = None
                     st.session_state.vaga = None
