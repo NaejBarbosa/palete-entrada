@@ -42,19 +42,21 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
 """, unsafe_allow_html=True)
 
 # ------------------------------
-# Função para mensagem centralizada (com opção de quebra de linha)
+# Função para mensagem centralizada (com quebra controlada)
 # ------------------------------
 def exibir_mensagem_centralizada(mensagem, quebrar_linha=False):
     """
     Exibe mensagem com a mesma formatação do st.success, centralizada,
     com animação de subir e desaparecer em 3 segundos.
-    
+
     Args:
-        mensagem (str): Texto da mensagem (pode conter HTML como <br>)
-        quebrar_linha (bool): Se True, permite quebra de linha automática e max-width
+        mensagem (str): Texto da mensagem. Se quebrar_linha=True e conter '<br>',
+                        a primeira parte será exibida sem quebra de linha.
+        quebrar_linha (bool): Se True, permite quebra de linha via <br> e
+                              trata a primeira parte como nowrap.
     """
     msg_id = f"msg_{uuid.uuid4().hex}"
-    
+
     # Estilos base
     style_base = """
         position: fixed;
@@ -74,17 +76,31 @@ def exibir_mensagem_centralizada(mensagem, quebrar_linha=False):
         font-family: inherit;
         animation: fadeOutUp 0.5s ease-in-out 2.5s forwards;
     """
-    
-    if quebrar_linha:
+
+    if quebrar_linha and '<br>' in mensagem:
+        # Divide a mensagem em duas partes
+        partes = mensagem.split('<br>', 1)
+        primeira = partes[0].strip()
+        segunda = partes[1].strip() if len(partes) > 1 else ''
+        # Monta HTML com primeira parte sem quebra
+        conteudo_html = f'<span style="white-space: nowrap;">✅ {primeira}</span>'
+        if segunda:
+            conteudo_html += f'<br><span>{segunda}</span>'
+        style_extra = "white-space: normal; max-width: 80vw; word-wrap: break-word;"
+    elif quebrar_linha:
+        # Se pediu quebra mas não tem <br>, usa quebra automática
+        conteudo_html = f'✅ {mensagem}'
         style_extra = "white-space: normal; max-width: 80vw; word-wrap: break-word;"
     else:
+        # Sem quebra de linha
+        conteudo_html = f'✅ {mensagem}'
         style_extra = "white-space: nowrap;"
-    
+
     style_completo = style_base + style_extra
-    
+
     html = f"""
     <div id="{msg_id}" style="{style_completo}">
-        ✅ {mensagem}
+        {conteudo_html}
     </div>
     <style>
         @keyframes fadeOutUp {{
@@ -261,7 +277,7 @@ if st.session_state.exibir_gerenciamento and camara_selecionada != "Selecione a 
                 with st.spinner("Excluindo registros..."):
                     num_excluidos = excluir_registros_vaga(sheet, camara_selecionada, vaga_selecionada)
                 if num_excluidos > 0:
-                    # Mensagem de exclusão com quebra de linha explícita após "sucesso!"
+                    # Mensagem com quebra exatamente após "sucesso!"
                     mensagem_exclusao = f"{num_excluidos} registro(s) excluído(s) com sucesso!<br>A vaga agora está livre."
                     exibir_mensagem_centralizada(mensagem_exclusao, quebrar_linha=True)
                     time.sleep(3)
@@ -337,7 +353,7 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                     })
                 try:
                     salvar_registros(sheet, registros_para_gravar)
-                    # Mensagem de salvamento sem quebra de linha (padrão)
+                    # Mensagem de salvamento sem quebra (comportamento padrão)
                     exibir_mensagem_centralizada(f"{len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
                     time.sleep(3)
                     st.session_state.produtos_temp = []
