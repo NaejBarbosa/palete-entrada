@@ -165,11 +165,14 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                 try:
                     salvar_registros(sheet, registros_para_gravar)
                     st.success(f"✅ {len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
-                    # Limpar sessão (mas sem mexer nos selects)
+                    # Limpar todos os estados da sessão
                     st.session_state.produtos_temp = []
                     st.session_state.camara = None
                     st.session_state.vaga = None
                     st.session_state.bloqueado = False
+                    # Limpar os selects para que comecem vazios no próximo uso
+                    st.session_state.camara_select = "Selecione a câmara"
+                    st.session_state.vaga_select = "Selecione a vaga"
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao salvar: {e}")
@@ -179,6 +182,9 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                 st.session_state.camara = None
                 st.session_state.vaga = None
                 st.session_state.bloqueado = False
+                # Limpar os selects também ao cancelar
+                st.session_state.camara_select = "Selecione a câmara"
+                st.session_state.vaga_select = "Selecione a vaga"
                 st.rerun()
 else:
     if st.session_state.bloqueado:
