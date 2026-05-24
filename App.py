@@ -12,10 +12,15 @@ st.set_page_config(page_title="Registro de Paletes", layout="centered")
 st.title("🍱 Entrada de Paletes - Câmaras Frias")
 
 # ------------------------------
-# CSS customizado para o botão verde
+# CSS customizado para o botão verde e centralização dos títulos
 # ------------------------------
 st.markdown("""
 <style>
+/* Centralizar títulos principais (h1) e subtítulos (h2) */
+h1, h2 {
+    text-align: center;
+}
+
 div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contains("Finalizar e enviar")) {
     background-color: #28a745 !important;
     border-color: #28a745 !important;
@@ -167,7 +172,7 @@ if st.session_state.exibir_gerenciamento and camara_selecionada != "Selecione a 
             st.dataframe(df_filtrado[['produto-marca', 'produto-descricao', 'validade']], use_container_width=True)
         else:
             st.info("Nenhum registro detalhado encontrado (inconsistência de dados).")
-        
+
         st.divider()
         st.warning("⚠️ **Ação irreversível:** Excluir todos os registros desta vaga.")
         col_confirm1, col_confirm2 = st.columns(2)
