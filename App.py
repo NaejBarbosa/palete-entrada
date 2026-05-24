@@ -49,7 +49,7 @@ def salvar_registros(sheet, registros):
 # Sessão do formulário
 # ------------------------------
 if 'produtos_temp' not in st.session_state:
-    st.session_state.produtos_temp = []   # lista de produtos (marca, descr, validade)
+    st.session_state.produtos_temp = []
 if 'camara' not in st.session_state:
     st.session_state.camara = None
 if 'vaga' not in st.session_state:
@@ -57,12 +57,12 @@ if 'vaga' not in st.session_state:
 if 'bloqueado' not in st.session_state:
     st.session_state.bloqueado = False
 
-# Conectar e carregar dados existentes (sempre atualizado)
+# Conectar e carregar dados existentes
 sheet = conectar_planilha()
 df_existente = carregar_dados_existentes(sheet)
 
 # ------------------------------
-# 1. Seleção da câmara e vaga (com placeholder vazio)
+# 1. Seleção da câmara e vaga
 # ------------------------------
 st.subheader("📍 Localização do Palete")
 
@@ -85,18 +85,19 @@ vagas = [
 vaga_opts = ["Selecione a vaga"] + vagas
 vaga_selecionada = st.selectbox("Vaga", vaga_opts, key="vaga_select")
 
-# Verificar duplicidade apenas quando ambos forem escolhidos (diferentes do placeholder)
+# Verificar duplicidade
 if camara_selecionada != "Selecione a câmara" and vaga_selecionada != "Selecione a vaga":
     if combina_existe(camara_selecionada, vaga_selecionada, df_existente):
         st.error(f"⚠️ A combinação {camara_selecionada} / {vaga_selecionada} já está sendo usada. Escolha outra vaga.")
         st.session_state.bloqueado = True
+        st.session_state.camara = None
+        st.session_state.vaga = None
     else:
         st.success("✅ Vaga disponível!")
         st.session_state.bloqueado = False
         st.session_state.camara = camara_selecionada
         st.session_state.vaga = vaga_selecionada
 else:
-    # Se ainda não escolheu ambos, não bloqueia
     st.session_state.bloqueado = False
     st.session_state.camara = None
     st.session_state.vaga = None
@@ -117,7 +118,6 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
         marca = st.selectbox("Produto / Marca", marca_opcoes)
         descricao = st.text_input("Descrição do produto (ex.: Peito de frango, 1kg)")
 
-        # Campo de validade com calendário (sem necessidade de digitar "/")
         data_validade = st.date_input(
             "Validade", 
             value=None, 
@@ -133,7 +133,6 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
             elif not descricao.strip():
                 st.error("Por favor, informe a descrição do produto.")
             else:
-                # Converte a data para string no formato dd/mm/aaaa
                 validade_str = data_validade.strftime("%d/%m/%Y")
                 st.session_state.produtos_temp.append({
                     "produto-marca": marca,
@@ -148,15 +147,12 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
         for i, p in enumerate(st.session_state.produtos_temp, 1):
             st.write(f"{i}. {p['produto-marca']} - {p['produto-descricao']} (val.: {p['validade']})")
 
-        # --- Botões de ação (mais apresentáveis) ---
         col1, col2, col3 = st.columns(3)
         with col1:
             if st.button("➕ Adicionar mais", use_container_width=True, type="secondary"):
-                # Apenas mantém os produtos atuais; a página recarrega e o formulário de produto aparece novamente
                 st.rerun()
         with col2:
             if st.button("✅ Finalizar e enviar", use_container_width=True, type="primary"):
-                # Monta os registros
                 registros_para_gravar = []
                 for prod in st.session_state.produtos_temp:
                     registros_para_gravar.append({
@@ -169,14 +165,11 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                 try:
                     salvar_registros(sheet, registros_para_gravar)
                     st.success(f"✅ {len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
-                    # Limpa tudo
+                    # Limpar sessão (mas sem mexer nos selects)
                     st.session_state.produtos_temp = []
                     st.session_state.camara = None
                     st.session_state.vaga = None
                     st.session_state.bloqueado = False
-                    # Reseta os selects para placeholder
-                    st.session_state.camara_select = "Selecione a câmara"
-                    st.session_state.vaga_select = "Selecione a vaga"
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao salvar: {e}")
@@ -186,8 +179,6 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                 st.session_state.camara = None
                 st.session_state.vaga = None
                 st.session_state.bloqueado = False
-                st.session_state.camara_select = "Selecione a câmara"
-                st.session_state.vaga_select = "Selecione a vaga"
                 st.rerun()
 else:
     if st.session_state.bloqueado:
