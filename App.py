@@ -14,7 +14,7 @@ st.set_page_config(page_title="Registro de Paletes", layout="centered")
 st.title("❄️ Entrada de Paletes | Perecíveis")
 
 # ------------------------------
-# CSS customizado + JavaScript para scroll no foco (solução Android)
+# CSS customizado + JavaScript para scroll no foco (solução Android + teclado)
 # ------------------------------
 st.markdown("""
 <style>
@@ -42,46 +42,74 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // Função para rolar suavemente até o elemento focado
-    function scrollToFocusedElement(event) {
-        const target = event.target;
-        // Aguarda um curto período para o teclado ser acionado
+    // Função para rolar o elemento focado para uma posição visível acima do teclado
+    function scrollToFocusedElement(element) {
+        // Aguarda um pequeno delay para o teclado começar a aparecer
         setTimeout(() => {
-            target.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-                inline: "nearest"
-            });
-            // Ajuste adicional para não ficar colado na borda inferior
-            window.scrollBy(0, -60);
-        }, 200);
+            const rect = element.getBoundingClientRect();
+            const viewportHeight = window.innerHeight;
+            // Altura estimada do teclado (média ~40% da tela, mas usamos margem segura)
+            const keyboardEstimate = viewportHeight * 0.4;
+            // Posição alvo: queremos que o elemento fique a 80px do topo após a rolagem
+            const targetTop = rect.top + window.scrollY - 80;
+            
+            // Se o elemento estiver na metade inferior da tela (próximo ao teclado)
+            if (rect.bottom > viewportHeight - keyboardEstimate) {
+                window.scrollTo({
+                    top: targetTop,
+                    behavior: "smooth"
+                });
+            } else {
+                // Pequeno ajuste suave mesmo se já estiver visível
+                window.scrollBy({
+                    top: 0,
+                    behavior: "smooth"
+                });
+            }
+        }, 250); // Tempo suficiente para o teclado começar a abrir
     }
 
-    // Seleciona todos os campos que podem receber foco em formulários Streamlit
+    // Observador de redimensionamento (teclado abre/fecha)
+    let lastViewportHeight = window.innerHeight;
+    let focusedElementAtResize = null;
+    
+    function onResize() {
+        const newHeight = window.innerHeight;
+        if (newHeight !== lastViewportHeight && document.activeElement) {
+            // O teclado mudou o tamanho da viewport
+            focusedElementAtResize = document.activeElement;
+            scrollToFocusedElement(focusedElementAtResize);
+        }
+        lastViewportHeight = newHeight;
+    }
+    
+    window.addEventListener('resize', onResize);
+
+    // Seleciona todos os campos que podem receber foco
     const focusableSelectors = [
         'input', 'select', 'textarea',
-        '[class*="st-b6"]',  // classes comuns do Streamlit para inputs
-        '[class*="st-b7"]',
-        '[role="combobox"]',
-        '[data-testid="stSelectbox"]',
-        '[data-testid="stDateInput"]',
-        '[data-testid="stTextInput"]'
+        '[class*="st-b6"]', '[class*="st-b7"]',
+        '[role="combobox"]', '[data-testid="stSelectbox"]',
+        '[data-testid="stDateInput"]', '[data-testid="stTextInput"]'
     ];
 
-    const focusableElements = document.querySelectorAll(focusableSelectors.join(','));
-    focusableElements.forEach(el => {
-        el.addEventListener('focus', scrollToFocusedElement);
-    });
+    function addScrollListener(el) {
+        if (!el.hasAttribute('data-scroll-listener')) {
+            el.setAttribute('data-scroll-listener', 'true');
+            el.addEventListener('focus', function(e) {
+                scrollToFocusedElement(e.target);
+            });
+        }
+    }
 
-    // Observador para elementos adicionados dinamicamente (ex: após rerun)
+    // Adiciona listeners aos elementos existentes
+    const focusableElements = document.querySelectorAll(focusableSelectors.join(','));
+    focusableElements.forEach(addScrollListener);
+
+    // Observador para elementos adicionados dinamicamente (Streamlit rerun)
     const observer = new MutationObserver(() => {
         const newElements = document.querySelectorAll(focusableSelectors.join(','));
-        newElements.forEach(el => {
-            if (!el.hasAttribute('data-scroll-listener')) {
-                el.setAttribute('data-scroll-listener', 'true');
-                el.addEventListener('focus', scrollToFocusedElement);
-            }
-        });
+        newElements.forEach(addScrollListener);
     });
     observer.observe(document.body, { childList: true, subtree: true });
 });
@@ -233,7 +261,7 @@ if st.session_state.exibir_gerenciamento and camara_selecionada != "Selecione a 
         ]
         st.write(f"**Registros encontrados para {camara_selecionada} / {vaga_selecionada}:**")
         if not df_filtrado.empty:
-            # 🔁 ALTERAÇÃO AQUI: agora exibe também a coluna 'registro'
+            # Exibe também a coluna 'registro'
             st.dataframe(df_filtrado[['registro', 'produto-marca', 'produto-descricao', 'validade']], use_container_width=True)
         else:
             st.info("Nenhum registro detalhado encontrado (inconsistência de dados).")
