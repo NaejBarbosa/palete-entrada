@@ -42,7 +42,7 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
 """, unsafe_allow_html=True)
 
 # ------------------------------
-# Função para mensagem centralizada com animação
+# Função para mensagem centralizada com animação (fonte padrão Streamlit)
 # ------------------------------
 def exibir_mensagem_centralizada(mensagem, tipo="success"):
     """
@@ -58,7 +58,6 @@ def exibir_mensagem_centralizada(mensagem, tipo="success"):
     cor_fundo = cores.get(tipo, "#28a745")
     cor_texto = "#ffffff" if tipo != "warning" else "#212529"
     
-    # ID único para evitar conflitos
     msg_id = f"msg_{uuid.uuid4().hex}"
     
     html = f"""
@@ -76,8 +75,6 @@ def exibir_mensagem_centralizada(mensagem, tipo="success"):
         font-size: 1.2rem;
         z-index: 9999;
         text-align: center;
-        white-space: nowrap;
-        font-family: system-ui, -apple-system, sans-serif;
         animation: fadeOutUp 0.5s ease-in-out 2.5s forwards;
     ">
         {mensagem}
