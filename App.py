@@ -45,22 +45,19 @@ def salvar_registros(sheet, registros):
 # ------------------------------
 # Gerenciamento de reset via query_params
 # ------------------------------
-# Obtém o token atual (padrão 0)
 params = st.query_params
 reset_token = params.get("reset_token", 0)
-# Converte para int (se for string)
 try:
     reset_token = int(reset_token)
 except:
     reset_token = 0
 
-# Função para forçar reset (incrementa token)
 def force_reset():
     st.query_params["reset_token"] = reset_token + 1
     st.rerun()
 
 # ------------------------------
-# Inicialização dos estados (que não dependem de widgets)
+# Inicialização dos estados
 # ------------------------------
 if 'produtos_temp' not in st.session_state:
     st.session_state.produtos_temp = []
@@ -76,7 +73,7 @@ sheet = conectar_planilha()
 df_existente = carregar_dados_existentes(sheet)
 
 # ------------------------------
-# 1. Seleção da câmara e vaga (com keys únicas baseadas no token)
+# 1. Seleção da câmara e vaga
 # ------------------------------
 st.subheader("📍 Localização do Palete")
 
@@ -96,11 +93,9 @@ vagas = [
 ]
 vaga_opts = ["Selecione a vaga"] + vagas
 
-# Usamos o reset_token nas keys para garantir que os selects sejam recriados
 camara_selecionada = st.selectbox("Câmara", camara_opts, index=0, key=f"camara_{reset_token}")
 vaga_selecionada = st.selectbox("Vaga", vaga_opts, index=0, key=f"vaga_{reset_token}")
 
-# Verificar duplicidade
 if camara_selecionada != "Selecione a câmara" and vaga_selecionada != "Selecione a vaga":
     if combina_existe(camara_selecionada, vaga_selecionada, df_existente):
         st.error(f"⚠️ A combinação {camara_selecionada} / {vaga_selecionada} já está sendo usada. Escolha outra vaga.")
@@ -124,13 +119,15 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
     st.subheader("📦 Produtos no Palete")
 
     with st.form(key="produto_form", clear_on_submit=True):
+        # 🔁 Ajuste: adiciona uma opção vazia no início da lista de marcas
         marca_opcoes = [
+            "",  # <--- opção vazia para deixar o campo sem pré-seleção
             "Seara", "Seara | Doriana", "Seara | Primor", "Seara | Excelsior",
             "Seara | Macedo", "Seara | Rezende (pizza)", "Lar", "BRF | Perdigão",
             "BRF | Sadia", "BRF | Claybom", "BRF | Qualy", "BRF | Becel",
             "Aurora", "Aurora | Peperi", "Aurora | Nobre", "Outro"
         ]
-        marca = st.selectbox("Produto / Marca", marca_opcoes)
+        marca = st.selectbox("Produto / Marca", marca_opcoes, index=0)  # index 0 = opção vazia
         descricao = st.text_input("Descrição do produto (ex.: Peito de frango, 1kg)")
 
         data_validade = st.date_input(
@@ -143,7 +140,10 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
         adicionado = st.form_submit_button("➕ Adicionar este produto")
 
         if adicionado:
-            if data_validade is None:
+            # Validação da marca vazia
+            if not marca.strip():
+                st.error("Por favor, selecione uma marca/produto válida.")
+            elif data_validade is None:
                 st.error("Por favor, selecione a data de validade.")
             elif not descricao.strip():
                 st.error("Por favor, informe a descrição do produto.")
@@ -180,12 +180,11 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                 try:
                     salvar_registros(sheet, registros_para_gravar)
                     st.success(f"✅ {len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
-                    # Limpar estados e forçar reset total (incrementa token)
                     st.session_state.produtos_temp = []
                     st.session_state.camara = None
                     st.session_state.vaga = None
                     st.session_state.bloqueado = False
-                    force_reset()  # Isso muda o token e recarrega a página
+                    force_reset()
                 except Exception as e:
                     st.error(f"Erro ao salvar: {e}")
         with col3:
