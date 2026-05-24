@@ -14,7 +14,7 @@ st.set_page_config(page_title="Registro de Paletes", layout="centered")
 st.title("❄️ Entrada de Paletes | Perecíveis")
 
 # ------------------------------
-# CSS customizado
+# CSS customizado + JavaScript para scroll no foco (solução Android)
 # ------------------------------
 st.markdown("""
 <style>
@@ -39,6 +39,53 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
     border-color: #1e7e34 !important;
 }
 </style>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Função para rolar suavemente até o elemento focado
+    function scrollToFocusedElement(event) {
+        const target = event.target;
+        // Aguarda um curto período para o teclado ser acionado
+        setTimeout(() => {
+            target.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+                inline: "nearest"
+            });
+            // Ajuste adicional para não ficar colado na borda inferior
+            window.scrollBy(0, -60);
+        }, 200);
+    }
+
+    // Seleciona todos os campos que podem receber foco em formulários Streamlit
+    const focusableSelectors = [
+        'input', 'select', 'textarea',
+        '[class*="st-b6"]',  // classes comuns do Streamlit para inputs
+        '[class*="st-b7"]',
+        '[role="combobox"]',
+        '[data-testid="stSelectbox"]',
+        '[data-testid="stDateInput"]',
+        '[data-testid="stTextInput"]'
+    ];
+
+    const focusableElements = document.querySelectorAll(focusableSelectors.join(','));
+    focusableElements.forEach(el => {
+        el.addEventListener('focus', scrollToFocusedElement);
+    });
+
+    // Observador para elementos adicionados dinamicamente (ex: após rerun)
+    const observer = new MutationObserver(() => {
+        const newElements = document.querySelectorAll(focusableSelectors.join(','));
+        newElements.forEach(el => {
+            if (!el.hasAttribute('data-scroll-listener')) {
+                el.setAttribute('data-scroll-listener', 'true');
+                el.addEventListener('focus', scrollToFocusedElement);
+            }
+        });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+});
+</script>
 """, unsafe_allow_html=True)
 
 # ------------------------------
