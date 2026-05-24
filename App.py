@@ -48,7 +48,7 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
 """, unsafe_allow_html=True)
 
 # ------------------------------
-# Conexão com Google Sheets
+# Conexão com Google Sheets e garantia do cabeçalho com "registro"
 # ------------------------------
 def conectar_planilha():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -57,10 +57,19 @@ def conectar_planilha():
     client = gspread.authorize(creds)
     sheet_id = "1HoN-VLyO5y9wJ4NKdpz42-BljRzT4VeJVY-Wio4CO6g"
     sheet = client.open_by_key(sheet_id).sheet1
+
+    # Garantir que o cabeçalho contenha a coluna "registro"
+    header = sheet.row_values(1)
+    if "registro" not in header:
+        # Adiciona a coluna "registro" ao final do cabeçalho
+        header.append("registro")
+        sheet.update('A1:Z1', [header])  # Atualiza a primeira linha com o novo cabeçalho
     return sheet
 
 def carregar_dados_existentes(sheet):
     dados = sheet.get_all_records()
+    # Se a coluna "registro" não existir nos dados (ex: planilha antiga sem dados ainda),
+    # o pandas lida automaticamente com NaN. Mas como já garantimos o cabeçalho, estará presente.
     return pd.DataFrame(dados)
 
 def combina_existe(camara, vaga, df_existente):
@@ -70,12 +79,15 @@ def combina_existe(camara, vaga, df_existente):
 
 def salvar_registros(sheet, registros):
     for reg in registros:
+        # Adiciona timestamp no formato dd/mm/aaaa hh:mm:ss
+        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         sheet.append_row([
             reg['camara'],
             reg['camara-vaga'],
             reg['produto-marca'],
             reg['produto-descricao'],
-            reg['validade']
+            reg['validade'],
+            timestamp  # nova coluna "registro"
         ])
 
 def excluir_registros_vaga(sheet, camara, vaga):
