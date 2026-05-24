@@ -103,7 +103,11 @@ if camara_selecionada != "Selecione a câmara" and vaga_selecionada != "Selecion
         st.session_state.camara = None
         st.session_state.vaga = None
     else:
-        st.success("✅ Vaga disponível!")
+        # Mensagem centralizada com estilo de sucesso
+        st.markdown(
+            '<div style="background-color: #d4edda; color: #155724; padding: 1rem; border-radius: 0.5rem; text-align: center;">Vaga disponível!</div>',
+            unsafe_allow_html=True
+        )
         st.session_state.bloqueado = False
         st.session_state.camara = camara_selecionada
         st.session_state.vaga = vaga_selecionada
@@ -119,15 +123,14 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
     st.subheader("📦 Produtos no Palete")
 
     with st.form(key="produto_form", clear_on_submit=True):
-        # 🔁 Ajuste: adiciona uma opção vazia no início da lista de marcas
         marca_opcoes = [
-            "",  # <--- opção vazia para deixar o campo sem pré-seleção
+            "",  # opção vazia para não pré-selecionar nada
             "Seara", "Seara | Doriana", "Seara | Primor", "Seara | Excelsior",
             "Seara | Macedo", "Seara | Rezende (pizza)", "Lar", "BRF | Perdigão",
             "BRF | Sadia", "BRF | Claybom", "BRF | Qualy", "BRF | Becel",
             "Aurora", "Aurora | Peperi", "Aurora | Nobre", "Outro"
         ]
-        marca = st.selectbox("Produto / Marca", marca_opcoes, index=0)  # index 0 = opção vazia
+        marca = st.selectbox("Produto / Marca", marca_opcoes, index=0)
         descricao = st.text_input("Descrição do produto (ex.: Peito de frango, 1kg)")
 
         data_validade = st.date_input(
@@ -140,7 +143,6 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
         adicionado = st.form_submit_button("➕ Adicionar este produto")
 
         if adicionado:
-            # Validação da marca vazia
             if not marca.strip():
                 st.error("Por favor, selecione uma marca/produto válida.")
             elif data_validade is None:
@@ -167,7 +169,8 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
             if st.button("➕ Adicionar mais", use_container_width=True, type="secondary"):
                 st.rerun()
         with col2:
-            if st.button("✅ Finalizar e enviar", use_container_width=True, type="primary"):
+            # Botão verde amigável (type="primary" já é verde)
+            if st.button("Finalizar e enviar", use_container_width=True, type="primary"):
                 registros_para_gravar = []
                 for prod in st.session_state.produtos_temp:
                     registros_para_gravar.append({
@@ -179,7 +182,8 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                     })
                 try:
                     salvar_registros(sheet, registros_para_gravar)
-                    st.success(f"✅ {len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
+                    # Mensagem de sucesso sem emoji
+                    st.success(f"{len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
                     st.session_state.produtos_temp = []
                     st.session_state.camara = None
                     st.session_state.vaga = None
