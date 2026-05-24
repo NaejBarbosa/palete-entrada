@@ -103,11 +103,8 @@ if camara_selecionada != "Selecione a câmara" and vaga_selecionada != "Selecion
         st.session_state.camara = None
         st.session_state.vaga = None
     else:
-        # Mensagem centralizada com estilo de sucesso
-        st.markdown(
-            '<div style="background-color: #d4edda; color: #155724; padding: 1rem; border-radius: 0.5rem; text-align: center;">Vaga disponível!</div>',
-            unsafe_allow_html=True
-        )
+        # Formatação padronizada com st.success (igual aos produtos adicionados)
+        st.success("Vaga disponível!")
         st.session_state.bloqueado = False
         st.session_state.camara = camara_selecionada
         st.session_state.vaga = vaga_selecionada
@@ -169,7 +166,6 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
             if st.button("➕ Adicionar mais", use_container_width=True, type="secondary"):
                 st.rerun()
         with col2:
-            # Botão verde amigável (type="primary" já é verde)
             if st.button("Finalizar e enviar", use_container_width=True, type="primary"):
                 registros_para_gravar = []
                 for prod in st.session_state.produtos_temp:
@@ -182,7 +178,6 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                     })
                 try:
                     salvar_registros(sheet, registros_para_gravar)
-                    # Mensagem de sucesso sem emoji
                     st.success(f"{len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
                     st.session_state.produtos_temp = []
                     st.session_state.camara = None
