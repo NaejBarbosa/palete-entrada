@@ -42,7 +42,7 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
 """, unsafe_allow_html=True)
 
 # ------------------------------
-# Função para mensagem centralizada (formato st.success)
+# Função para mensagem centralizada (mesmo estilo do st.success)
 # ------------------------------
 def exibir_mensagem_centralizada(mensagem):
     """
@@ -297,7 +297,8 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                     "produto-descricao": descricao,
                     "validade": validade_str
                 })
-                st.success(f"Produto '{marca}' adicionado! Total: {len(st.session_state.produtos_temp)}")
+                # Mensagem padronizada com a função centralizada (mesmo estilo de "Vaga disponível")
+                exibir_mensagem_centralizada(f"Produto '{marca}' adicionado! Total: {len(st.session_state.produtos_temp)}")
 
     if st.session_state.produtos_temp:
         st.write("**Produtos neste palete:**")
