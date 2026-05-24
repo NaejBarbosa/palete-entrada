@@ -4,6 +4,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from datetime import datetime, date
 import re
+import pytz  # Para fuso horário correto
 
 # ------------------------------
 # Configuração da página
@@ -56,18 +57,11 @@ def conectar_planilha():
 
     header = sheet.row_values(1)
     if not header:
-        # Planilha vazia: cria o cabeçalho
         sheet.append_row(colunas_corretas)
     elif header != colunas_corretas:
-        # Se o cabeçalho existir mas não tiver 'registro' no início, insere a coluna
         if "registro" not in header:
-            # Adiciona 'registro' no início
             sheet.insert_cols(1)
             sheet.update_cell(1, 1, "registro")
-            # Se as outras colunas estiverem desordenadas, não reordenamos automaticamente
-            # para evitar perda de dados. Mas garantimos que a coluna 'registro' existe.
-            # O usuário deve ajustar manualmente se necessário.
-            pass
     return sheet
 
 def carregar_dados_existentes(sheet):
@@ -80,9 +74,10 @@ def combina_existe(camara, vaga, df_existente):
     return ((df_existente['camara'] == camara) & (df_existente['camara-vaga'] == vaga)).any()
 
 def salvar_registros(sheet, registros):
+    # Define o fuso horário de Santa Catarina (Brasil) -> UTC-3
+    tz = pytz.timezone('America/Sao_Paulo')
     for reg in registros:
-        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        # Ordem correta: registro, camara, camara-vaga, produto-marca, produto-descricao, validade
+        timestamp = datetime.now(tz).strftime("%d/%m/%Y %H:%M:%S")
         sheet.append_row([
             timestamp,
             reg['camara'],
@@ -93,14 +88,10 @@ def salvar_registros(sheet, registros):
         ])
 
 def excluir_registros_vaga(sheet, camara, vaga):
-    """Exclui todas as linhas da planilha que correspondem à câmara e vaga informadas.
-    Retorna o número de registros excluídos."""
+    """Exclui todas as linhas da planilha que correspondem à câmara e vaga informadas."""
     all_values = sheet.get_all_values()
     if not all_values:
         return 0
-    # Cabeçalho na primeira linha (índice 0)
-    # As linhas de dados começam no índice 1 (linha 2 da planilha)
-    # Agora a coluna 'camara' está no índice 1, 'camara-vaga' no índice 2
     rows_to_delete = []
     for i, row in enumerate(all_values[1:], start=2):
         if len(row) >= 3 and row[1] == camara and row[2] == vaga:
