@@ -3,7 +3,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from datetime import datetime
-import pytz  # Para fuso horário correto
+import pytz
 
 # ------------------------------
 # Configuração da página
@@ -12,11 +12,11 @@ st.set_page_config(page_title="Registro de Paletes", layout="centered")
 st.title("❄️ Entrada de Paletes | Perecíveis")
 
 # ------------------------------
-# CSS + JavaScript para scroll e desativação do Autofill
+# CSS e JavaScript para bloquear autofill + rolagem suave
 # ------------------------------
 st.markdown("""
 <style>
-/* --- Estilos CSS existentes (mantidos) --- */
+/* Estilos existentes */
 h1, h2 { text-align: center; }
 h1 { font-size: 1.5rem !important; white-space: nowrap; }
 @media (max-width: 480px) { h1 { font-size: 1.2rem !important; } }
@@ -32,7 +32,68 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // --- 1. Rolagem suave ao focar (já existente, aprimorada) ---
+    // ========================
+    // 1. BLOQUEIO AVANÇADO DE AUTOFILL
+    // ========================
+    
+    // Cria um campo oculto "isca" antes de qualquer formulário real
+    let baitField = document.createElement('input');
+    baitField.type = 'text';
+    baitField.style.display = 'none';
+    baitField.setAttribute('autocomplete', 'off');
+    baitField.setAttribute('aria-hidden', 'true');
+    document.body.insertBefore(baitField, document.body.firstChild);
+    
+    // Função para remover atributos 'name' e 'id' que podem trigger autofill
+    function sanitizeElement(el) {
+        // Remove name e id se eles tiverem palavras-chave comuns (email, endereco, cartao)
+        let name = el.getAttribute('name');
+        let id = el.getAttribute('id');
+        if (name && /(email|user|login|endereco|address|card|cartao|credential|password)/i.test(name)) {
+            el.removeAttribute('name');
+        }
+        if (id && /(email|user|login|endereco|address|card|cartao|credential|password)/i.test(id)) {
+            el.removeAttribute('id');
+        }
+        
+        // Força autocomplete desativado
+        el.setAttribute('autocomplete', 'off');
+        
+        // Para inputs de texto, também força new-password (engana o Smart Lock)
+        if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'search' || el.type === 'tel' || el.type === 'url')) {
+            el.setAttribute('autocomplete', 'new-password');
+        }
+        
+        // Impede autocorreção e sugestões de teclado
+        el.setAttribute('autocorrect', 'off');
+        el.setAttribute('spellcheck', 'false');
+        el.setAttribute('autocapitalize', 'none');
+        
+        // Android WebView específico
+        el.setAttribute('importantForAutofill', 'off');
+        
+        // Adiciona um atributo único aleatório para evitar cache de autofill
+        let randomAttr = 'x-' + Math.random().toString(36).substring(2, 8);
+        el.setAttribute(randomAttr, '');
+    }
+    
+    // Aplica a todos os campos de formulário (incluindo selects)
+    const selectors = 'input, select, textarea, [role="combobox"], [data-testid="stSelectbox"], [data-testid="stDateInput"]';
+    
+    function applyToAllFields() {
+        document.querySelectorAll(selectors).forEach(field => {
+            sanitizeElement(field);
+        });
+    }
+    
+    // Executa imediatamente e também observa mudanças na DOM
+    applyToAllFields();
+    const observer = new MutationObserver(applyToAllFields);
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    // ========================
+    // 2. ROLAGEM SUAVE AO FOCO (Android)
+    // ========================
     function scrollToFocusedElement(element) {
         setTimeout(() => {
             const rect = element.getBoundingClientRect();
@@ -43,52 +104,27 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }, 250);
     }
-
-    // --- 2. DESABILITAR AUTOFILL E SUGESTÕES (NOVO) ---
-    function disableAutofill(element) {
-        // Atributos principais para desabilitar autofill
-        element.setAttribute('autocomplete', 'nope');  // Valor incomum para enganar o navegador
-        element.setAttribute('autocorrect', 'off');
-        element.setAttribute('spellcheck', 'false');
-        element.setAttribute('autocapitalize', 'none');
-        // Atributo específico para Android (Chromium)
-        element.setAttribute('importantForAutofill', 'off');
-        // Para campos de texto, evita sugestões de senha também
-        if (element.tagName === 'INPUT' && element.type !== 'password') {
-            element.setAttribute('autocomplete', 'new-password');
+    
+    function addFocusScroll(el) {
+        if (!el.hasAttribute('data-scroll-listener')) {
+            el.setAttribute('data-scroll-listener', 'true');
+            el.addEventListener('focus', (e) => scrollToFocusedElement(e.target));
         }
     }
-
-    // Seletores para todos os campos que devem ser tratados
-    const selectors = [
-        'input', 'select', 'textarea',
-        '[class*="st-b6"]', '[class*="st-b7"]',
-        '[role="combobox"]', '[data-testid="stSelectbox"]',
-        '[data-testid="stDateInput"]', '[data-testid="stTextInput"]'
-    ].join(',');
-
-    // Aplica as funções a cada elemento encontrado
-    function applyToAllInputs() {
-        document.querySelectorAll(selectors).forEach(el => {
-            if (!el.hasAttribute('data-scroll-listener')) {
-                el.setAttribute('data-scroll-listener', 'true');
-                el.addEventListener('focus', (e) => scrollToFocusedElement(e.target));
-            }
-            // Desabilita autofill para este elemento
-            disableAutofill(el);
-        });
-    }
-
-    // Executa ao carregar a página e sempre que houver mudanças (Mutação)
-    applyToAllInputs();
-    const observer = new MutationObserver(applyToAllInputs);
-    observer.observe(document.body, { childList: true, subtree: true });
+    
+    const focusableSelectors = 'input, select, textarea, [role="combobox"], [data-testid="stSelectbox"], [data-testid="stDateInput"], [data-testid="stTextInput"]';
+    document.querySelectorAll(focusableSelectors).forEach(addFocusScroll);
+    
+    const focusObserver = new MutationObserver(() => {
+        document.querySelectorAll(focusableSelectors).forEach(addFocusScroll);
+    });
+    focusObserver.observe(document.body, { childList: true, subtree: true });
 });
 </script>
 """, unsafe_allow_html=True)
 
 # ------------------------------
-# Conexão com Google Sheets e lógica de negócio (mantida)
+# Conexão com Google Sheets (código original preservado)
 # ------------------------------
 def conectar_planilha():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -137,7 +173,7 @@ def excluir_registros_vaga(sheet, camara, vaga):
     return len(rows_to_delete)
 
 # ------------------------------
-# Gerenciamento de reset via query_params
+# Reset via query_params
 # ------------------------------
 params = st.query_params
 reset_token = params.get("reset_token", 0)
@@ -151,7 +187,7 @@ def force_reset():
     st.rerun()
 
 # ------------------------------
-# Inicialização dos estados
+# Estados iniciais
 # ------------------------------
 if 'produtos_temp' not in st.session_state:
     st.session_state.produtos_temp = []
@@ -168,7 +204,7 @@ sheet = conectar_planilha()
 df_existente = carregar_dados_existentes(sheet)
 
 # ------------------------------
-# 1. Seleção da câmara e vaga
+# Interface principal (inalterada)
 # ------------------------------
 st.subheader("📍 Localização do Palete")
 camaras = ["Resfriados 1", "Resfriados 2", "Congelados 1", "Congelados 2"]
@@ -207,9 +243,7 @@ else:
     st.session_state.vaga = None
     st.session_state.exibir_gerenciamento = False
 
-# ------------------------------
-# 1.1 Gerenciamento de vaga ocupada
-# ------------------------------
+# Gerenciamento de vaga ocupada
 if st.session_state.exibir_gerenciamento and camara_selecionada != "Selecione a câmara" and vaga_selecionada != "Selecione a vaga":
     with st.expander("🔍 Gerenciar vaga ocupada", expanded=True):
         df_filtrado = df_existente[
@@ -221,7 +255,6 @@ if st.session_state.exibir_gerenciamento and camara_selecionada != "Selecione a 
             st.dataframe(df_filtrado[['registro', 'produto-marca', 'produto-descricao', 'validade']], use_container_width=True)
         else:
             st.info("Nenhum registro detalhado encontrado (inconsistência de dados).")
-
         st.divider()
         st.warning("⚠️ **Ação irreversível:** Excluir todos os registros desta vaga.")
         col_confirm1, col_confirm2 = st.columns(2)
@@ -244,12 +277,9 @@ if st.session_state.exibir_gerenciamento and camara_selecionada != "Selecione a 
                     st.error("Nenhum registro foi excluído. Verifique se a combinação realmente existe.")
         st.info("💡 Após excluir, a vaga ficará livre para novo cadastro.")
 
-# ------------------------------
-# 2. Adicionar produtos (se vaga disponível)
-# ------------------------------
+# Adicionar produtos
 if not st.session_state.bloqueado and st.session_state.camara and st.session_state.vaga:
     st.subheader("📦 Produtos no Palete")
-
     with st.form(key="produto_form", clear_on_submit=True):
         marca_opcoes = [ "", "Seara", "Seara | Doriana", "Seara | Primor", "Seara | Excelsior",
                          "Seara | Macedo", "Seara | Rezende (pizza)", "Lar", "BRF | Perdigão",
@@ -257,9 +287,8 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                          "Aurora", "Aurora | Peperi", "Aurora | Nobre", "Outro" ]
         marca = st.selectbox("Produto / Marca", marca_opcoes, index=0)
         descricao = st.text_input("Descrição do produto (ex.: Peito de frango, 1kg)")
-        data_validade = st.date_input( "Validade", value=None, format="DD/MM/YYYY")
+        data_validade = st.date_input("Validade", value=None, format="DD/MM/YYYY")
         adicionado = st.form_submit_button("➕ Adicionar este produto")
-
         if adicionado:
             if not marca.strip():
                 st.error("Por favor, selecione uma marca/produto válida.")
@@ -275,12 +304,10 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                     "validade": validade_str
                 })
                 st.success(f"Produto '{marca}' adicionado! Total: {len(st.session_state.produtos_temp)}")
-
     if st.session_state.produtos_temp:
         st.write("**Produtos neste palete:**")
         for i, p in enumerate(st.session_state.produtos_temp, 1):
             st.write(f"{i}. {p['produto-marca']} - {p['produto-descricao']} (val.: {p['validade']})")
-
         col1, col2, col3 = st.columns(3)
         with col1:
             if st.button("➕ Adicionar mais", use_container_width=True, type="secondary"):
