@@ -9,16 +9,31 @@ import re
 # Configuração da página
 # ------------------------------
 st.set_page_config(page_title="Registro de Paletes", layout="centered")
-st.title("🍱 Entrada de Paletes - Câmaras Frias")
+
+# NOVO TÍTULO (substituído)
+st.title("❄️ Entrada de Paletes | Perecíveis")
 
 # ------------------------------
-# CSS customizado para o botão verde e centralização dos títulos
+# CSS customizado: centralização dos títulos + ajuste de fonte para não quebrar linha
 # ------------------------------
 st.markdown("""
 <style>
 /* Centralizar títulos principais (h1) e subtítulos (h2) */
 h1, h2 {
     text-align: center;
+}
+
+/* Ajuste para que o título principal não quebre linha em telas pequenas */
+h1 {
+    font-size: 1.5rem !important;
+    white-space: nowrap;
+}
+
+/* Em telas muito estreitas (ex: celular em retrato), reduzir mais a fonte */
+@media (max-width: 480px) {
+    h1 {
+        font-size: 1.2rem !important;
+    }
 }
 
 div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contains("Finalizar e enviar")) {
