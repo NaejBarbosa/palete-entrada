@@ -233,7 +233,8 @@ if st.session_state.exibir_gerenciamento and camara_selecionada != "Selecione a 
         ]
         st.write(f"**Registros encontrados para {camara_selecionada} / {vaga_selecionada}:**")
         if not df_filtrado.empty:
-            st.dataframe(df_filtrado[['produto-marca', 'produto-descricao', 'validade']], use_container_width=True)
+            # 🔁 ALTERAÇÃO AQUI: agora exibe também a coluna 'registro'
+            st.dataframe(df_filtrado[['registro', 'produto-marca', 'produto-descricao', 'validade']], use_container_width=True)
         else:
             st.info("Nenhum registro detalhado encontrado (inconsistência de dados).")
 
