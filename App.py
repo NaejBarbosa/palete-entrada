@@ -42,12 +42,13 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
 """, unsafe_allow_html=True)
 
 # ------------------------------
-# Função para mensagem centralizada (mesmo estilo do st.success)
+# Função para mensagem centralizada (mesmo estilo do st.success, com quebra de linha)
 # ------------------------------
 def exibir_mensagem_centralizada(mensagem):
     """
     Exibe mensagem com a mesma formatação do st.success, centralizada,
     com animação de subir e desaparecer em 3 segundos.
+    Suporta quebra de linha automática em mensagens longas.
     """
     msg_id = f"msg_{uuid.uuid4().hex}"
     html = f"""
@@ -66,7 +67,9 @@ def exibir_mensagem_centralizada(mensagem):
         font-size: 1rem;
         z-index: 9999;
         text-align: center;
-        white-space: nowrap;
+        max-width: 80vw;
+        word-wrap: break-word;
+        white-space: normal;
         font-family: inherit;
         animation: fadeOutUp 0.5s ease-in-out 2.5s forwards;
     ">
@@ -247,6 +250,7 @@ if st.session_state.exibir_gerenciamento and camara_selecionada != "Selecione a 
                 with st.spinner("Excluindo registros..."):
                     num_excluidos = excluir_registros_vaga(sheet, camara_selecionada, vaga_selecionada)
                 if num_excluidos > 0:
+                    # Mensagem com quebra de linha automática (graças à função ajustada)
                     exibir_mensagem_centralizada(f"{num_excluidos} registro(s) excluído(s) com sucesso! A vaga agora está livre.")
                     time.sleep(3)
                     df_existente = carregar_dados_existentes(sheet)
@@ -297,7 +301,7 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                     "produto-descricao": descricao,
                     "validade": validade_str
                 })
-                # Mensagem de confirmação removida conforme solicitado
+                # Sem mensagem de confirmação (conforme solicitado)
 
     if st.session_state.produtos_temp:
         st.write("**Produtos neste palete:**")
