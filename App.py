@@ -4,6 +4,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from datetime import datetime
 import pytz
+import time  # necessário para o delay antes do reset
 
 # ------------------------------
 # Configuração da página
@@ -192,7 +193,9 @@ if st.session_state.exibir_gerenciamento and camara_selecionada != "Selecione a 
                 with st.spinner("Excluindo registros..."):
                     num_excluidos = excluir_registros_vaga(sheet, camara_selecionada, vaga_selecionada)
                 if num_excluidos > 0:
-                    st.toast(f"{num_excluidos} registro(s) excluído(s) com sucesso! A vaga agora está livre.", duration=5000)
+                    # Mensagem suave com duração de 3 segundos antes do reset
+                    st.toast(f"{num_excluidos} registro(s) excluído(s) com sucesso! A vaga agora está livre.", duration=3000)
+                    time.sleep(3)  # Aguarda a mensagem desaparecer naturalmente
                     df_existente = carregar_dados_existentes(sheet)
                     st.session_state.bloqueado = False
                     st.session_state.camara = camara_selecionada
@@ -265,7 +268,9 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                     })
                 try:
                     salvar_registros(sheet, registros_para_gravar)
-                    st.toast(f"{len(registros_para_gravar)} produto(s) registrado(s) com sucesso!", duration=5000)
+                    # Mensagem suave com duração de 3 segundos antes do reset
+                    st.toast(f"{len(registros_para_gravar)} produto(s) registrado(s) com sucesso!", duration=3000)
+                    time.sleep(3)  # Aguarda a mensagem desaparecer naturalmente
                     st.session_state.produtos_temp = []
                     st.session_state.camara = None
                     st.session_state.vaga = None
