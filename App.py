@@ -42,32 +42,22 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
 """, unsafe_allow_html=True)
 
 # ------------------------------
-# Função para mensagem centralizada com animação (fonte padrão Streamlit)
+# Função para mensagem centralizada (fundo preto, texto branco)
 # ------------------------------
-def exibir_mensagem_centralizada(mensagem, tipo="success"):
+def exibir_mensagem_centralizada(mensagem):
     """
-    Exibe uma mensagem flutuante no centro da tela com animação de subir e desaparecer.
-    tipo: "success", "error", "warning", "info"
+    Exibe uma mensagem flutuante no centro da tela com fundo preto, texto branco,
+    animação de subir e desaparecer em 3 segundos.
     """
-    cores = {
-        "success": "#28a745",
-        "error": "#dc3545",
-        "warning": "#ffc107",
-        "info": "#17a2b8"
-    }
-    cor_fundo = cores.get(tipo, "#28a745")
-    cor_texto = "#ffffff" if tipo != "warning" else "#212529"
-    
     msg_id = f"msg_{uuid.uuid4().hex}"
-    
     html = f"""
     <div id="{msg_id}" style="
         position: fixed;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background-color: {cor_fundo};
-        color: {cor_texto};
+        background-color: black;
+        color: white;
         padding: 16px 32px;
         border-radius: 12px;
         box-shadow: 0 4px 20px rgba(0,0,0,0.3);
@@ -254,7 +244,7 @@ if st.session_state.exibir_gerenciamento and camara_selecionada != "Selecione a 
                 with st.spinner("Excluindo registros..."):
                     num_excluidos = excluir_registros_vaga(sheet, camara_selecionada, vaga_selecionada)
                 if num_excluidos > 0:
-                    exibir_mensagem_centralizada(f"{num_excluidos} registro(s) excluído(s) com sucesso! A vaga agora está livre.", tipo="success")
+                    exibir_mensagem_centralizada(f"{num_excluidos} registro(s) excluído(s) com sucesso! A vaga agora está livre.")
                     time.sleep(3)
                     df_existente = carregar_dados_existentes(sheet)
                     st.session_state.bloqueado = False
@@ -328,7 +318,7 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                     })
                 try:
                     salvar_registros(sheet, registros_para_gravar)
-                    exibir_mensagem_centralizada(f"{len(registros_para_gravar)} produto(s) registrado(s) com sucesso!", tipo="success")
+                    exibir_mensagem_centralizada(f"{len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
                     time.sleep(3)
                     st.session_state.produtos_temp = []
                     st.session_state.camara = None
