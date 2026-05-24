@@ -14,7 +14,9 @@ st.set_page_config(page_title="Registro de Paletes", layout="centered")
 st.title("❄️ Entrada de Paletes | Perecíveis")
 
 # ------------------------------
-# CSS customizado + JavaScript para scroll no foco (solução Android + teclado)
+# CSS + JavaScript: 
+# 1) Rolagem suave ao focar
+# 2) Forçar dropdown para cima quando teclado ativo e campo na parte inferior
 # ------------------------------
 st.markdown("""
 <style>
@@ -42,76 +44,127 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // Função para rolar o elemento focado para uma posição visível acima do teclado
+    // ------------------------------------------------------------
+    // 1. Rolagem suave ao focar (já existente, aprimorada)
+    // ------------------------------------------------------------
     function scrollToFocusedElement(element) {
-        // Aguarda um pequeno delay para o teclado começar a aparecer
         setTimeout(() => {
             const rect = element.getBoundingClientRect();
             const viewportHeight = window.innerHeight;
-            // Altura estimada do teclado (média ~40% da tela, mas usamos margem segura)
             const keyboardEstimate = viewportHeight * 0.4;
-            // Posição alvo: queremos que o elemento fique a 80px do topo após a rolagem
-            const targetTop = rect.top + window.scrollY - 80;
-            
-            // Se o elemento estiver na metade inferior da tela (próximo ao teclado)
             if (rect.bottom > viewportHeight - keyboardEstimate) {
                 window.scrollTo({
-                    top: targetTop,
-                    behavior: "smooth"
-                });
-            } else {
-                // Pequeno ajuste suave mesmo se já estiver visível
-                window.scrollBy({
-                    top: 0,
+                    top: rect.top + window.scrollY - 80,
                     behavior: "smooth"
                 });
             }
-        }, 250); // Tempo suficiente para o teclado começar a abrir
+        }, 250);
     }
 
-    // Observador de redimensionamento (teclado abre/fecha)
-    let lastViewportHeight = window.innerHeight;
-    let focusedElementAtResize = null;
-    
-    function onResize() {
-        const newHeight = window.innerHeight;
-        if (newHeight !== lastViewportHeight && document.activeElement) {
-            // O teclado mudou o tamanho da viewport
-            focusedElementAtResize = document.activeElement;
-            scrollToFocusedElement(focusedElementAtResize);
+    // ------------------------------------------------------------
+    // 2. Reposicionar dropdown para CIMA quando necessário
+    // ------------------------------------------------------------
+    function adjustDropdownPosition(selectElement) {
+        // Encontra o menu dropdown associado ao selectbox
+        const dropdownId = selectElement.getAttribute('aria-controls');
+        let dropdown = dropdownId ? document.getElementById(dropdownId) : null;
+        
+        // Se não encontrou, busca um elemento filho com role="listbox" ou classe de menu
+        if (!dropdown) {
+            dropdown = selectElement.parentElement?.querySelector('[role="listbox"], .st-bq, .st-br');
         }
-        lastViewportHeight = newHeight;
+        
+        if (!dropdown) return;
+        
+        const rect = selectElement.getBoundingClientRect();
+        const dropdownHeight = dropdown.offsetHeight;
+        const viewportHeight = window.innerHeight;
+        const spaceBelow = viewportHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        
+        // Se há mais espaço acima do que abaixo, força o dropdown para cima
+        if (spaceAbove > spaceBelow || spaceBelow < dropdownHeight) {
+            dropdown.style.top = 'auto';
+            dropdown.style.bottom = `${viewportHeight - rect.top + 8}px`;
+            dropdown.style.transformOrigin = 'bottom';
+        } else {
+            // Comportamento padrão (para baixo)
+            dropdown.style.top = `${rect.bottom + 5}px`;
+            dropdown.style.bottom = 'auto';
+            dropdown.style.transformOrigin = 'top';
+        }
+    }
+
+    // ------------------------------------------------------------
+    // Aplica ajuste ao abrir o dropdown (evento de clique/foco)
+    // ------------------------------------------------------------
+    function setupSelectBehavior(selectElement) {
+        if (selectElement.hasAttribute('data-dropdown-adjusted')) return;
+        selectElement.setAttribute('data-dropdown-adjusted', 'true');
+        
+        // Para selectbox do Streamlit, o dropdown aparece ao clicar no elemento
+        selectElement.addEventListener('click', function() {
+            setTimeout(() => adjustDropdownPosition(selectElement), 50);
+        });
+        selectElement.addEventListener('focus', function() {
+            setTimeout(() => adjustDropdownPosition(selectElement), 50);
+        });
+        
+        // Também ao redimensionar a tela (teclado abre/fecha)
+        window.addEventListener('resize', function() {
+            if (document.activeElement === selectElement) {
+                adjustDropdownPosition(selectElement);
+            }
+        });
+    }
+
+    // ------------------------------------------------------------
+    // Observar todos os selects e inputs especiais do Streamlit
+    // ------------------------------------------------------------
+    const selectors = [
+        '[data-testid="stSelectbox"]', 
+        '[data-testid="stDateInput"]',
+        '[role="combobox"]'
+    ];
+    
+    function addListenersToElements() {
+        document.querySelectorAll(selectors.join(',')).forEach(el => {
+            setupSelectBehavior(el);
+        });
     }
     
-    window.addEventListener('resize', onResize);
-
-    // Seleciona todos os campos que podem receber foco
+    // Inicial
+    addListenersToElements();
+    
+    // Observador para elementos dinâmicos (após rerun)
+    const observer = new MutationObserver(() => {
+        addListenersToElements();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    // ------------------------------------------------------------
+    // Rolagem suave para campos de texto/date (mantido)
+    // ------------------------------------------------------------
     const focusableSelectors = [
         'input', 'select', 'textarea',
         '[class*="st-b6"]', '[class*="st-b7"]',
         '[role="combobox"]', '[data-testid="stSelectbox"]',
         '[data-testid="stDateInput"]', '[data-testid="stTextInput"]'
     ];
-
+    
     function addScrollListener(el) {
         if (!el.hasAttribute('data-scroll-listener')) {
             el.setAttribute('data-scroll-listener', 'true');
-            el.addEventListener('focus', function(e) {
-                scrollToFocusedElement(e.target);
-            });
+            el.addEventListener('focus', (e) => scrollToFocusedElement(e.target));
         }
     }
-
-    // Adiciona listeners aos elementos existentes
-    const focusableElements = document.querySelectorAll(focusableSelectors.join(','));
-    focusableElements.forEach(addScrollListener);
-
-    // Observador para elementos adicionados dinamicamente (Streamlit rerun)
-    const observer = new MutationObserver(() => {
-        const newElements = document.querySelectorAll(focusableSelectors.join(','));
-        newElements.forEach(addScrollListener);
+    
+    document.querySelectorAll(focusableSelectors.join(',')).forEach(addScrollListener);
+    
+    const scrollObserver = new MutationObserver(() => {
+        document.querySelectorAll(focusableSelectors.join(',')).forEach(addScrollListener);
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    scrollObserver.observe(document.body, { childList: true, subtree: true });
 });
 </script>
 """, unsafe_allow_html=True)
@@ -261,7 +314,6 @@ if st.session_state.exibir_gerenciamento and camara_selecionada != "Selecione a 
         ]
         st.write(f"**Registros encontrados para {camara_selecionada} / {vaga_selecionada}:**")
         if not df_filtrado.empty:
-            # Exibe também a coluna 'registro'
             st.dataframe(df_filtrado[['registro', 'produto-marca', 'produto-descricao', 'validade']], use_container_width=True)
         else:
             st.info("Nenhum registro detalhado encontrado (inconsistência de dados).")
