@@ -62,13 +62,15 @@ sheet = conectar_planilha()
 df_existente = carregar_dados_existentes(sheet)
 
 # ------------------------------
-# 1. Seleção da câmara e vaga
+# 1. Seleção da câmara e vaga (com placeholder vazio)
 # ------------------------------
 st.subheader("📍 Localização do Palete")
 
 camaras = ["Resfriados 1", "Resfriados 2", "Congelados 1", "Congelados 2"]
-camara_selecionada = st.selectbox("Câmara", camaras, key="camara_select")
-vaga_selecionada = st.selectbox("Vaga", [
+camara_opts = ["Selecione a câmara"] + camaras
+camara_selecionada = st.selectbox("Câmara", camara_opts, key="camara_select")
+
+vagas = [
     "A10D","A10E","A11D","A11E","A12D","A12E","A13D","A13E",
     "A20D","A20E","A21D","A21E","A22D","A22E","A23D","A23E",
     "A30D","A30E","A31D","A31E","A32D","A32E","A33D","A33E",
@@ -79,10 +81,12 @@ vaga_selecionada = st.selectbox("Vaga", [
     "B30D","B30E","B31D","B31E","B32D","B32E","B33D","B33E",
     "B40D","B40E","B41D","B41E","B42D","B42E","B43D","B43E",
     "B50D","B50E","B51D","B51E","B52D","B52E","B53D","B53E"
-], key="vaga_select")
+]
+vaga_opts = ["Selecione a vaga"] + vagas
+vaga_selecionada = st.selectbox("Vaga", vaga_opts, key="vaga_select")
 
-# Verificar duplicidade
-if camara_selecionada and vaga_selecionada:
+# Verificar duplicidade apenas quando ambos forem escolhidos (diferentes do placeholder)
+if camara_selecionada != "Selecione a câmara" and vaga_selecionada != "Selecione a vaga":
     if combina_existe(camara_selecionada, vaga_selecionada, df_existente):
         st.error(f"⚠️ A combinação {camara_selecionada} / {vaga_selecionada} já está sendo usada. Escolha outra vaga.")
         st.session_state.bloqueado = True
@@ -91,6 +95,11 @@ if camara_selecionada and vaga_selecionada:
         st.session_state.bloqueado = False
         st.session_state.camara = camara_selecionada
         st.session_state.vaga = vaga_selecionada
+else:
+    # Se ainda não escolheu ambos, não bloqueia
+    st.session_state.bloqueado = False
+    st.session_state.camara = None
+    st.session_state.vaga = None
 
 # ------------------------------
 # 2. Adicionar produtos (se vaga disponível)
@@ -107,7 +116,7 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
         ]
         marca = st.selectbox("Produto / Marca", marca_opcoes)
         descricao = st.text_input("Descrição do produto (ex.: Peito de frango, 1kg)")
-        
+
         # Campo de validade com calendário (sem necessidade de digitar "/")
         data_validade = st.date_input(
             "Validade", 
@@ -115,7 +124,7 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
             format="DD/MM/YYYY",
             help="Selecione a data no calendário"
         )
-        
+
         adicionado = st.form_submit_button("➕ Adicionar este produto")
 
         if adicionado:
@@ -161,11 +170,17 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                 try:
                     salvar_registros(sheet, registros_para_gravar)
                     st.success(f"✅ {len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
+                    
                     # Limpar todos os campos do formulário
                     st.session_state.produtos_temp = []
                     st.session_state.camara = None
                     st.session_state.vaga = None
                     st.session_state.bloqueado = False
+                    
+                    # Resetar os widgets de câmara e vaga para o placeholder
+                    st.session_state.camara_select = "Selecione a câmara"
+                    st.session_state.vaga_select = "Selecione a vaga"
+                    
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao salvar: {e}")
