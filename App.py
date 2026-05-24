@@ -42,13 +42,12 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
 """, unsafe_allow_html=True)
 
 # ------------------------------
-# Função para mensagem centralizada profissional
+# Função para mensagem centralizada (formato st.success)
 # ------------------------------
 def exibir_mensagem_centralizada(mensagem):
     """
-    Exibe mensagem profissional no centro da tela:
-    fundo preto semi-transparente, texto branco, sem quebra de linha.
-    Animação: sobe e some em 3 segundos.
+    Exibe mensagem com a mesma formatação do st.success, centralizada,
+    com animação de subir e desaparecer em 3 segundos.
     """
     msg_id = f"msg_{uuid.uuid4().hex}"
     html = f"""
@@ -57,22 +56,21 @@ def exibir_mensagem_centralizada(mensagem):
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background-color: rgba(0, 0, 0, 0.85);
-        color: white;
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+        border-radius: 0.5rem;
         padding: 12px 24px;
-        border-radius: 40px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         font-weight: 500;
         font-size: 1rem;
-        letter-spacing: 0.3px;
         z-index: 9999;
         text-align: center;
         white-space: nowrap;
-        backdrop-filter: blur(2px);
         font-family: inherit;
         animation: fadeOutUp 0.5s ease-in-out 2.5s forwards;
     ">
-        {mensagem}
+        ✅ {mensagem}
     </div>
     <style>
         @keyframes fadeOutUp {{
