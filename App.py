@@ -12,6 +12,22 @@ st.set_page_config(page_title="Registro de Paletes", layout="centered")
 st.title("🍱 Entrada de Paletes - Câmaras Frias")
 
 # ------------------------------
+# CSS customizado para o botão verde
+# ------------------------------
+st.markdown("""
+<style>
+div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contains("Finalizar e enviar")) {
+    background-color: #28a745 !important;
+    border-color: #28a745 !important;
+}
+div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contains("Finalizar e enviar")):hover {
+    background-color: #218838 !important;
+    border-color: #1e7e34 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ------------------------------
 # Conexão com Google Sheets
 # ------------------------------
 def conectar_planilha():
@@ -103,7 +119,6 @@ if camara_selecionada != "Selecione a câmara" and vaga_selecionada != "Selecion
         st.session_state.camara = None
         st.session_state.vaga = None
     else:
-        # Formatação padronizada com st.success (igual aos produtos adicionados)
         st.success("Vaga disponível!")
         st.session_state.bloqueado = False
         st.session_state.camara = camara_selecionada
@@ -166,7 +181,7 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
             if st.button("➕ Adicionar mais", use_container_width=True, type="secondary"):
                 st.rerun()
         with col2:
-            if st.button("Finalizar e enviar", use_container_width=True, type="primary"):
+            if st.button("Finalizar e enviar", use_container_width=True, type="primary", key="finalizar_button"):
                 registros_para_gravar = []
                 for prod in st.session_state.produtos_temp:
                     registros_para_gravar.append({
