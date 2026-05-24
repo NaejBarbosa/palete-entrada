@@ -43,7 +43,24 @@ def salvar_registros(sheet, registros):
         ])
 
 # ------------------------------
-# Inicialização dos estados
+# Gerenciamento de reset via query_params
+# ------------------------------
+# Obtém o token atual (padrão 0)
+params = st.query_params
+reset_token = params.get("reset_token", 0)
+# Converte para int (se for string)
+try:
+    reset_token = int(reset_token)
+except:
+    reset_token = 0
+
+# Função para forçar reset (incrementa token)
+def force_reset():
+    st.query_params["reset_token"] = reset_token + 1
+    st.rerun()
+
+# ------------------------------
+# Inicialização dos estados (que não dependem de widgets)
 # ------------------------------
 if 'produtos_temp' not in st.session_state:
     st.session_state.produtos_temp = []
@@ -53,15 +70,13 @@ if 'vaga' not in st.session_state:
     st.session_state.vaga = None
 if 'bloqueado' not in st.session_state:
     st.session_state.bloqueado = False
-if 'reset_selects' not in st.session_state:
-    st.session_state.reset_selects = False
 
 # Carregar dados
 sheet = conectar_planilha()
 df_existente = carregar_dados_existentes(sheet)
 
 # ------------------------------
-# 1. Seleção da câmara e vaga
+# 1. Seleção da câmara e vaga (com keys únicas baseadas no token)
 # ------------------------------
 st.subheader("📍 Localização do Palete")
 
@@ -81,26 +96,9 @@ vagas = [
 ]
 vaga_opts = ["Selecione a vaga"] + vagas
 
-# Se reset_selects estiver ativo, forçamos os selects para os valores padrão
-if st.session_state.reset_selects:
-    default_camara = "Selecione a câmara"
-    default_vaga = "Selecione a vaga"
-    st.session_state.reset_selects = False
-else:
-    # Caso contrário, usamos os valores armazenados (se houver)
-    default_camara = st.session_state.get('camara_selecionada', "Selecione a câmara")
-    default_vaga = st.session_state.get('vaga_selecionada', "Selecione a vaga")
-
-# Determinar índices
-camara_index = camara_opts.index(default_camara) if default_camara in camara_opts else 0
-vaga_index = vaga_opts.index(default_vaga) if default_vaga in vaga_opts else 0
-
-camara_selecionada = st.selectbox("Câmara", camara_opts, index=camara_index, key="camara_select")
-vaga_selecionada = st.selectbox("Vaga", vaga_opts, index=vaga_index, key="vaga_select")
-
-# Armazenar seleções atuais
-st.session_state.camara_selecionada = camara_selecionada
-st.session_state.vaga_selecionada = vaga_selecionada
+# Usamos o reset_token nas keys para garantir que os selects sejam recriados
+camara_selecionada = st.selectbox("Câmara", camara_opts, index=0, key=f"camara_{reset_token}")
+vaga_selecionada = st.selectbox("Vaga", vaga_opts, index=0, key=f"vaga_{reset_token}")
 
 # Verificar duplicidade
 if camara_selecionada != "Selecione a câmara" and vaga_selecionada != "Selecione a vaga":
@@ -182,14 +180,12 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                 try:
                     salvar_registros(sheet, registros_para_gravar)
                     st.success(f"✅ {len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
-                    # Limpar todos os estados
+                    # Limpar estados e forçar reset total (incrementa token)
                     st.session_state.produtos_temp = []
                     st.session_state.camara = None
                     st.session_state.vaga = None
                     st.session_state.bloqueado = False
-                    # Forçar reset dos selects na próxima execução
-                    st.session_state.reset_selects = True
-                    st.rerun()
+                    force_reset()  # Isso muda o token e recarrega a página
                 except Exception as e:
                     st.error(f"Erro ao salvar: {e}")
         with col3:
@@ -198,8 +194,7 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                 st.session_state.camara = None
                 st.session_state.vaga = None
                 st.session_state.bloqueado = False
-                st.session_state.reset_selects = True
-                st.rerun()
+                force_reset()
 else:
     if st.session_state.bloqueado:
         st.info("🔁 Altere a câmara ou vaga para uma combinação livre.")
