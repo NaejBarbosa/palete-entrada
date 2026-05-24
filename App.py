@@ -2,36 +2,24 @@ import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
-from datetime import datetime, date
-import re
+from datetime import datetime
 import pytz  # Para fuso horário correto
 
 # ------------------------------
 # Configuração da página
 # ------------------------------
 st.set_page_config(page_title="Registro de Paletes", layout="centered")
-
 st.title("❄️ Entrada de Paletes | Perecíveis")
 
 # ------------------------------
-# CSS + JavaScript: 
-# 1) Rolagem suave ao focar
-# 2) Forçar dropdown para cima quando teclado ativo e campo na parte inferior
+# CSS + JavaScript para scroll e desativação do Autofill
 # ------------------------------
 st.markdown("""
 <style>
-h1, h2 {
-    text-align: center;
-}
-h1 {
-    font-size: 1.5rem !important;
-    white-space: nowrap;
-}
-@media (max-width: 480px) {
-    h1 {
-        font-size: 1.2rem !important;
-    }
-}
+/* --- Estilos CSS existentes (mantidos) --- */
+h1, h2 { text-align: center; }
+h1 { font-size: 1.5rem !important; white-space: nowrap; }
+@media (max-width: 480px) { h1 { font-size: 1.2rem !important; } }
 div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contains("Finalizar e enviar")) {
     background-color: #28a745 !important;
     border-color: #28a745 !important;
@@ -44,133 +32,63 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // ------------------------------------------------------------
-    // 1. Rolagem suave ao focar (já existente, aprimorada)
-    // ------------------------------------------------------------
+    // --- 1. Rolagem suave ao focar (já existente, aprimorada) ---
     function scrollToFocusedElement(element) {
         setTimeout(() => {
             const rect = element.getBoundingClientRect();
             const viewportHeight = window.innerHeight;
             const keyboardEstimate = viewportHeight * 0.4;
             if (rect.bottom > viewportHeight - keyboardEstimate) {
-                window.scrollTo({
-                    top: rect.top + window.scrollY - 80,
-                    behavior: "smooth"
-                });
+                window.scrollTo({ top: rect.top + window.scrollY - 80, behavior: "smooth" });
             }
         }, 250);
     }
 
-    // ------------------------------------------------------------
-    // 2. Reposicionar dropdown para CIMA quando necessário
-    // ------------------------------------------------------------
-    function adjustDropdownPosition(selectElement) {
-        // Encontra o menu dropdown associado ao selectbox
-        const dropdownId = selectElement.getAttribute('aria-controls');
-        let dropdown = dropdownId ? document.getElementById(dropdownId) : null;
-        
-        // Se não encontrou, busca um elemento filho com role="listbox" ou classe de menu
-        if (!dropdown) {
-            dropdown = selectElement.parentElement?.querySelector('[role="listbox"], .st-bq, .st-br');
-        }
-        
-        if (!dropdown) return;
-        
-        const rect = selectElement.getBoundingClientRect();
-        const dropdownHeight = dropdown.offsetHeight;
-        const viewportHeight = window.innerHeight;
-        const spaceBelow = viewportHeight - rect.bottom;
-        const spaceAbove = rect.top;
-        
-        // Se há mais espaço acima do que abaixo, força o dropdown para cima
-        if (spaceAbove > spaceBelow || spaceBelow < dropdownHeight) {
-            dropdown.style.top = 'auto';
-            dropdown.style.bottom = `${viewportHeight - rect.top + 8}px`;
-            dropdown.style.transformOrigin = 'bottom';
-        } else {
-            // Comportamento padrão (para baixo)
-            dropdown.style.top = `${rect.bottom + 5}px`;
-            dropdown.style.bottom = 'auto';
-            dropdown.style.transformOrigin = 'top';
+    // --- 2. DESABILITAR AUTOFILL E SUGESTÕES (NOVO) ---
+    function disableAutofill(element) {
+        // Atributos principais para desabilitar autofill
+        element.setAttribute('autocomplete', 'nope');  // Valor incomum para enganar o navegador
+        element.setAttribute('autocorrect', 'off');
+        element.setAttribute('spellcheck', 'false');
+        element.setAttribute('autocapitalize', 'none');
+        // Atributo específico para Android (Chromium)
+        element.setAttribute('importantForAutofill', 'off');
+        // Para campos de texto, evita sugestões de senha também
+        if (element.tagName === 'INPUT' && element.type !== 'password') {
+            element.setAttribute('autocomplete', 'new-password');
         }
     }
 
-    // ------------------------------------------------------------
-    // Aplica ajuste ao abrir o dropdown (evento de clique/foco)
-    // ------------------------------------------------------------
-    function setupSelectBehavior(selectElement) {
-        if (selectElement.hasAttribute('data-dropdown-adjusted')) return;
-        selectElement.setAttribute('data-dropdown-adjusted', 'true');
-        
-        // Para selectbox do Streamlit, o dropdown aparece ao clicar no elemento
-        selectElement.addEventListener('click', function() {
-            setTimeout(() => adjustDropdownPosition(selectElement), 50);
-        });
-        selectElement.addEventListener('focus', function() {
-            setTimeout(() => adjustDropdownPosition(selectElement), 50);
-        });
-        
-        // Também ao redimensionar a tela (teclado abre/fecha)
-        window.addEventListener('resize', function() {
-            if (document.activeElement === selectElement) {
-                adjustDropdownPosition(selectElement);
-            }
-        });
-    }
-
-    // ------------------------------------------------------------
-    // Observar todos os selects e inputs especiais do Streamlit
-    // ------------------------------------------------------------
+    // Seletores para todos os campos que devem ser tratados
     const selectors = [
-        '[data-testid="stSelectbox"]', 
-        '[data-testid="stDateInput"]',
-        '[role="combobox"]'
-    ];
-    
-    function addListenersToElements() {
-        document.querySelectorAll(selectors.join(',')).forEach(el => {
-            setupSelectBehavior(el);
-        });
-    }
-    
-    // Inicial
-    addListenersToElements();
-    
-    // Observador para elementos dinâmicos (após rerun)
-    const observer = new MutationObserver(() => {
-        addListenersToElements();
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    
-    // ------------------------------------------------------------
-    // Rolagem suave para campos de texto/date (mantido)
-    // ------------------------------------------------------------
-    const focusableSelectors = [
         'input', 'select', 'textarea',
         '[class*="st-b6"]', '[class*="st-b7"]',
         '[role="combobox"]', '[data-testid="stSelectbox"]',
         '[data-testid="stDateInput"]', '[data-testid="stTextInput"]'
-    ];
-    
-    function addScrollListener(el) {
-        if (!el.hasAttribute('data-scroll-listener')) {
-            el.setAttribute('data-scroll-listener', 'true');
-            el.addEventListener('focus', (e) => scrollToFocusedElement(e.target));
-        }
+    ].join(',');
+
+    // Aplica as funções a cada elemento encontrado
+    function applyToAllInputs() {
+        document.querySelectorAll(selectors).forEach(el => {
+            if (!el.hasAttribute('data-scroll-listener')) {
+                el.setAttribute('data-scroll-listener', 'true');
+                el.addEventListener('focus', (e) => scrollToFocusedElement(e.target));
+            }
+            // Desabilita autofill para este elemento
+            disableAutofill(el);
+        });
     }
-    
-    document.querySelectorAll(focusableSelectors.join(',')).forEach(addScrollListener);
-    
-    const scrollObserver = new MutationObserver(() => {
-        document.querySelectorAll(focusableSelectors.join(',')).forEach(addScrollListener);
-    });
-    scrollObserver.observe(document.body, { childList: true, subtree: true });
+
+    // Executa ao carregar a página e sempre que houver mudanças (Mutação)
+    applyToAllInputs();
+    const observer = new MutationObserver(applyToAllInputs);
+    observer.observe(document.body, { childList: true, subtree: true });
 });
 </script>
 """, unsafe_allow_html=True)
 
 # ------------------------------
-# Conexão com Google Sheets
+# Conexão com Google Sheets e lógica de negócio (mantida)
 # ------------------------------
 def conectar_planilha():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -180,9 +98,7 @@ def conectar_planilha():
     sheet_id = "1HoN-VLyO5y9wJ4NKdpz42-BljRzT4VeJVY-Wio4CO6g"
     sheet = client.open_by_key(sheet_id).sheet1
 
-    # Ordem correta das colunas
     colunas_corretas = ["registro", "camara", "camara-vaga", "produto-marca", "produto-descricao", "validade"]
-
     header = sheet.row_values(1)
     if not header:
         sheet.append_row(colunas_corretas)
@@ -202,21 +118,13 @@ def combina_existe(camara, vaga, df_existente):
     return ((df_existente['camara'] == camara) & (df_existente['camara-vaga'] == vaga)).any()
 
 def salvar_registros(sheet, registros):
-    # Define o fuso horário de Santa Catarina (Brasil) -> UTC-3
     tz = pytz.timezone('America/Sao_Paulo')
     for reg in registros:
         timestamp = datetime.now(tz).strftime("%d/%m/%Y %H:%M:%S")
-        sheet.append_row([
-            timestamp,
-            reg['camara'],
-            reg['camara-vaga'],
-            reg['produto-marca'],
-            reg['produto-descricao'],
-            reg['validade']
-        ])
+        sheet.append_row([ timestamp, reg['camara'], reg['camara-vaga'],
+                           reg['produto-marca'], reg['produto-descricao'], reg['validade'] ])
 
 def excluir_registros_vaga(sheet, camara, vaga):
-    """Exclui todas as linhas da planilha que correspondem à câmara e vaga informadas."""
     all_values = sheet.get_all_values()
     if not all_values:
         return 0
@@ -256,7 +164,6 @@ if 'bloqueado' not in st.session_state:
 if 'exibir_gerenciamento' not in st.session_state:
     st.session_state.exibir_gerenciamento = False
 
-# Carregar dados
 sheet = conectar_planilha()
 df_existente = carregar_dados_existentes(sheet)
 
@@ -264,21 +171,18 @@ df_existente = carregar_dados_existentes(sheet)
 # 1. Seleção da câmara e vaga
 # ------------------------------
 st.subheader("📍 Localização do Palete")
-
 camaras = ["Resfriados 1", "Resfriados 2", "Congelados 1", "Congelados 2"]
 camara_opts = ["Selecione a câmara"] + camaras
-vagas = [
-    "A10D","A10E","A11D","A11E","A12D","A12E","A13D","A13E",
-    "A20D","A20E","A21D","A21E","A22D","A22E","A23D","A23E",
-    "A30D","A30E","A31D","A31E","A32D","A32E","A33D","A33E",
-    "A40D","A40E","A41D","A41E","A42D","A42E","A43D","A43E",
-    "A50D","A50E","A51D","A51E","A52D","A52E","A53D","A53E",
-    "B10D","B10E","B11D","B11E","B12D","B12E","B13D","B13E",
-    "B20D","B20E","B21D","B21E","B22D","B22E","B23D","B23E",
-    "B30D","B30E","B31D","B31E","B32D","B32E","B33D","B33E",
-    "B40D","B40E","B41D","B41E","B42D","B42E","B43D","B43E",
-    "B50D","B50E","B51D","B51E","B52D","B52E","B53D","B53E"
-]
+vagas = [ "A10D","A10E","A11D","A11E","A12D","A12E","A13D","A13E",
+          "A20D","A20E","A21D","A21E","A22D","A22E","A23D","A23E",
+          "A30D","A30E","A31D","A31E","A32D","A32E","A33D","A33E",
+          "A40D","A40E","A41D","A41E","A42D","A42E","A43D","A43E",
+          "A50D","A50E","A51D","A51E","A52D","A52E","A53D","A53E",
+          "B10D","B10E","B11D","B11E","B12D","B12E","B13D","B13E",
+          "B20D","B20E","B21D","B21E","B22D","B22E","B23D","B23E",
+          "B30D","B30E","B31D","B31E","B32D","B32E","B33D","B33E",
+          "B40D","B40E","B41D","B41E","B42D","B42E","B43D","B43E",
+          "B50D","B50E","B51D","B51E","B52D","B52E","B53D","B53E" ]
 vaga_opts = ["Selecione a vaga"] + vagas
 
 camara_selecionada = st.selectbox("Câmara", camara_opts, index=0, key=f"camara_{reset_token}")
@@ -347,20 +251,13 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
     st.subheader("📦 Produtos no Palete")
 
     with st.form(key="produto_form", clear_on_submit=True):
-        marca_opcoes = [
-            "", "Seara", "Seara | Doriana", "Seara | Primor", "Seara | Excelsior",
-            "Seara | Macedo", "Seara | Rezende (pizza)", "Lar", "BRF | Perdigão",
-            "BRF | Sadia", "BRF | Claybom", "BRF | Qualy", "BRF | Becel",
-            "Aurora", "Aurora | Peperi", "Aurora | Nobre", "Outro"
-        ]
+        marca_opcoes = [ "", "Seara", "Seara | Doriana", "Seara | Primor", "Seara | Excelsior",
+                         "Seara | Macedo", "Seara | Rezende (pizza)", "Lar", "BRF | Perdigão",
+                         "BRF | Sadia", "BRF | Claybom", "BRF | Qualy", "BRF | Becel",
+                         "Aurora", "Aurora | Peperi", "Aurora | Nobre", "Outro" ]
         marca = st.selectbox("Produto / Marca", marca_opcoes, index=0)
         descricao = st.text_input("Descrição do produto (ex.: Peito de frango, 1kg)")
-        data_validade = st.date_input(
-            "Validade", 
-            value=None, 
-            format="DD/MM/YYYY",
-            help="Selecione a data no calendário"
-        )
+        data_validade = st.date_input( "Validade", value=None, format="DD/MM/YYYY")
         adicionado = st.form_submit_button("➕ Adicionar este produto")
 
         if adicionado:
