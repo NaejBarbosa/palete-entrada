@@ -6,7 +6,7 @@ from datetime import datetime, date
 import re
 
 # ------------------------------
-# Configuração da página (mobile friendly)
+# Configuração da página
 # ------------------------------
 st.set_page_config(page_title="Registro de Paletes", layout="centered")
 st.title("🍱 Entrada de Paletes - Câmaras Frias")
@@ -53,29 +53,20 @@ if 'vaga' not in st.session_state:
     st.session_state.vaga = None
 if 'bloqueado' not in st.session_state:
     st.session_state.bloqueado = False
-if 'camara_selecionada' not in st.session_state:
-    st.session_state.camara_selecionada = "Selecione a câmara"
-if 'vaga_selecionada' not in st.session_state:
-    st.session_state.vaga_selecionada = "Selecione a vaga"
+if 'reset_selects' not in st.session_state:
+    st.session_state.reset_selects = False
 
 # Carregar dados
 sheet = conectar_planilha()
 df_existente = carregar_dados_existentes(sheet)
 
 # ------------------------------
-# 1. Seleção da câmara e vaga (controlada por índice)
+# 1. Seleção da câmara e vaga
 # ------------------------------
 st.subheader("📍 Localização do Palete")
 
 camaras = ["Resfriados 1", "Resfriados 2", "Congelados 1", "Congelados 2"]
 camara_opts = ["Selecione a câmara"] + camaras
-# Determina o índice baseado na variável de sessão
-try:
-    camara_index = camara_opts.index(st.session_state.camara_selecionada)
-except ValueError:
-    camara_index = 0
-camara_selecionada = st.selectbox("Câmara", camara_opts, index=camara_index, key="camara_select")
-
 vagas = [
     "A10D","A10E","A11D","A11E","A12D","A12E","A13D","A13E",
     "A20D","A20E","A21D","A21E","A22D","A22E","A23D","A23E",
@@ -89,13 +80,25 @@ vagas = [
     "B50D","B50E","B51D","B51E","B52D","B52E","B53D","B53E"
 ]
 vaga_opts = ["Selecione a vaga"] + vagas
-try:
-    vaga_index = vaga_opts.index(st.session_state.vaga_selecionada)
-except ValueError:
-    vaga_index = 0
+
+# Se reset_selects estiver ativo, forçamos os selects para os valores padrão
+if st.session_state.reset_selects:
+    default_camara = "Selecione a câmara"
+    default_vaga = "Selecione a vaga"
+    st.session_state.reset_selects = False
+else:
+    # Caso contrário, usamos os valores armazenados (se houver)
+    default_camara = st.session_state.get('camara_selecionada', "Selecione a câmara")
+    default_vaga = st.session_state.get('vaga_selecionada', "Selecione a vaga")
+
+# Determinar índices
+camara_index = camara_opts.index(default_camara) if default_camara in camara_opts else 0
+vaga_index = vaga_opts.index(default_vaga) if default_vaga in vaga_opts else 0
+
+camara_selecionada = st.selectbox("Câmara", camara_opts, index=camara_index, key="camara_select")
 vaga_selecionada = st.selectbox("Vaga", vaga_opts, index=vaga_index, key="vaga_select")
 
-# Atualiza as variáveis de sessão com o que o usuário escolheu
+# Armazenar seleções atuais
 st.session_state.camara_selecionada = camara_selecionada
 st.session_state.vaga_selecionada = vaga_selecionada
 
@@ -179,14 +182,13 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                 try:
                     salvar_registros(sheet, registros_para_gravar)
                     st.success(f"✅ {len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
-                    # Limpar estados
+                    # Limpar todos os estados
                     st.session_state.produtos_temp = []
                     st.session_state.camara = None
                     st.session_state.vaga = None
                     st.session_state.bloqueado = False
-                    # Resetar os selects para os valores padrão
-                    st.session_state.camara_selecionada = "Selecione a câmara"
-                    st.session_state.vaga_selecionada = "Selecione a vaga"
+                    # Forçar reset dos selects na próxima execução
+                    st.session_state.reset_selects = True
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao salvar: {e}")
@@ -196,8 +198,7 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                 st.session_state.camara = None
                 st.session_state.vaga = None
                 st.session_state.bloqueado = False
-                st.session_state.camara_selecionada = "Selecione a câmara"
-                st.session_state.vaga_selecionada = "Selecione a vaga"
+                st.session_state.reset_selects = True
                 st.rerun()
 else:
     if st.session_state.bloqueado:
