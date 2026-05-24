@@ -148,15 +148,15 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
         for i, p in enumerate(st.session_state.produtos_temp, 1):
             st.write(f"{i}. {p['produto-marca']} - {p['produto-descricao']} (val.: {p['validade']})")
 
-        # Botão para enviar os dados para a planilha
-        if st.button("✅ Enviar dados para a planilha"):
-            # Confirmação se deseja adicionar mais produtos
-            confirmar = st.radio(
-                "Deseja adicionar mais produtos para esta mesma câmara/vaga?",
-                ("Sim, adicionar mais", "Não, finalizar e enviar")
-            )
-            if confirmar == "Não, finalizar e enviar":
-                # Monta registros para gravar na planilha
+        # --- Botões de ação (mais apresentáveis) ---
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("➕ Adicionar mais", use_container_width=True, type="secondary"):
+                # Apenas mantém os produtos atuais; a página recarrega e o formulário de produto aparece novamente
+                st.rerun()
+        with col2:
+            if st.button("✅ Finalizar e enviar", use_container_width=True, type="primary"):
+                # Monta os registros
                 registros_para_gravar = []
                 for prod in st.session_state.produtos_temp:
                     registros_para_gravar.append({
@@ -166,24 +166,29 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                         "produto-descricao": prod["produto-descricao"],
                         "validade": prod["validade"]
                     })
-                # Enviar para a planilha
                 try:
                     salvar_registros(sheet, registros_para_gravar)
                     st.success(f"✅ {len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
-                    
-                    # Limpar todos os campos do formulário
+                    # Limpa tudo
                     st.session_state.produtos_temp = []
                     st.session_state.camara = None
                     st.session_state.vaga = None
                     st.session_state.bloqueado = False
-                    
-                    # Resetar os widgets de câmara e vaga para o placeholder
+                    # Reseta os selects para placeholder
                     st.session_state.camara_select = "Selecione a câmara"
                     st.session_state.vaga_select = "Selecione a vaga"
-                    
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao salvar: {e}")
+        with col3:
+            if st.button("🗑️ Cancelar palete", use_container_width=True, type="secondary"):
+                st.session_state.produtos_temp = []
+                st.session_state.camara = None
+                st.session_state.vaga = None
+                st.session_state.bloqueado = False
+                st.session_state.camara_select = "Selecione a câmara"
+                st.session_state.vaga_select = "Selecione a vaga"
+                st.rerun()
 else:
     if st.session_state.bloqueado:
         st.info("🔁 Altere a câmara ou vaga para uma combinação livre.")
