@@ -14,7 +14,7 @@ st.set_page_config(page_title="Registro de Paletes", layout="centered")
 st.title("❄️ Entrada de Paletes | Perecíveis")
 
 # ------------------------------
-# CSS mínimo (incluindo responsividade da mensagem)
+# CSS mínimo (apenas aparência, sem scroll)
 # ------------------------------
 st.markdown("""
 <style>
@@ -38,30 +38,25 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
     background-color: #218838 !important;
     border-color: #1e7e34 !important;
 }
-/* Responsividade para mensagens centralizadas */
-@media (max-width: 768px) {
-    .centralized-message {
-        white-space: normal !important;
-        max-width: 90vw !important;
-        word-wrap: break-word !important;
-    }
-}
 </style>
 """, unsafe_allow_html=True)
 
 # ------------------------------
-# Função para mensagem centralizada (com quebra apenas em mobile)
+# Função para mensagem centralizada (com opção de quebra de linha)
 # ------------------------------
-def exibir_mensagem_centralizada(mensagem):
+def exibir_mensagem_centralizada(mensagem, quebrar_linha=False):
     """
     Exibe mensagem com a mesma formatação do st.success, centralizada,
     com animação de subir e desaparecer em 3 segundos.
-    Em desktops, a mensagem fica em uma única linha.
-    Em smartphones, quebra automaticamente se necessário.
+    
+    Args:
+        mensagem (str): Texto da mensagem (pode conter HTML como <br>)
+        quebrar_linha (bool): Se True, permite quebra de linha automática e max-width
     """
     msg_id = f"msg_{uuid.uuid4().hex}"
-    html = f"""
-    <div id="{msg_id}" class="centralized-message" style="
+    
+    # Estilos base
+    style_base = """
         position: fixed;
         top: 50%;
         left: 50%;
@@ -76,10 +71,19 @@ def exibir_mensagem_centralizada(mensagem):
         font-size: 1rem;
         z-index: 9999;
         text-align: center;
-        white-space: nowrap;
         font-family: inherit;
         animation: fadeOutUp 0.5s ease-in-out 2.5s forwards;
-    ">
+    """
+    
+    if quebrar_linha:
+        style_extra = "white-space: normal; max-width: 80vw; word-wrap: break-word;"
+    else:
+        style_extra = "white-space: nowrap;"
+    
+    style_completo = style_base + style_extra
+    
+    html = f"""
+    <div id="{msg_id}" style="{style_completo}">
         ✅ {mensagem}
     </div>
     <style>
@@ -257,7 +261,9 @@ if st.session_state.exibir_gerenciamento and camara_selecionada != "Selecione a 
                 with st.spinner("Excluindo registros..."):
                     num_excluidos = excluir_registros_vaga(sheet, camara_selecionada, vaga_selecionada)
                 if num_excluidos > 0:
-                    exibir_mensagem_centralizada(f"{num_excluidos} registro(s) excluído(s) com sucesso! A vaga agora está livre.")
+                    # Mensagem de exclusão com quebra de linha explícita após "sucesso!"
+                    mensagem_exclusao = f"{num_excluidos} registro(s) excluído(s) com sucesso!<br>A vaga agora está livre."
+                    exibir_mensagem_centralizada(mensagem_exclusao, quebrar_linha=True)
                     time.sleep(3)
                     df_existente = carregar_dados_existentes(sheet)
                     st.session_state.bloqueado = False
@@ -307,7 +313,7 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                     "produto-descricao": descricao,
                     "validade": validade_str
                 })
-                # Sem mensagem de confirmação
+                # Sem mensagem de confirmação (conforme solicitado anteriormente)
 
     if st.session_state.produtos_temp:
         st.write("**Produtos neste palete:**")
@@ -331,6 +337,7 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                     })
                 try:
                     salvar_registros(sheet, registros_para_gravar)
+                    # Mensagem de salvamento sem quebra de linha (padrão)
                     exibir_mensagem_centralizada(f"{len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
                     time.sleep(3)
                     st.session_state.produtos_temp = []
