@@ -297,8 +297,7 @@ if not st.session_state.bloqueado and st.session_state.camara and st.session_sta
                     "produto-descricao": descricao,
                     "validade": validade_str
                 })
-                # Mensagem padronizada com a função centralizada (mesmo estilo de "Vaga disponível")
-                exibir_mensagem_centralizada(f"Produto '{marca}' adicionado! Total: {len(st.session_state.produtos_temp)}")
+                # Mensagem de confirmação removida conforme solicitado
 
     if st.session_state.produtos_temp:
         st.write("**Produtos neste palete:**")
