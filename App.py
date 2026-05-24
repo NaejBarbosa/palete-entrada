@@ -42,12 +42,13 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
 """, unsafe_allow_html=True)
 
 # ------------------------------
-# Função para mensagem centralizada (fundo preto, texto branco)
+# Função para mensagem centralizada profissional
 # ------------------------------
 def exibir_mensagem_centralizada(mensagem):
     """
-    Exibe uma mensagem flutuante no centro da tela com fundo preto, texto branco,
-    animação de subir e desaparecer em 3 segundos.
+    Exibe mensagem profissional no centro da tela:
+    fundo preto semi-transparente, texto branco, sem quebra de linha.
+    Animação: sobe e some em 3 segundos.
     """
     msg_id = f"msg_{uuid.uuid4().hex}"
     html = f"""
@@ -56,15 +57,19 @@ def exibir_mensagem_centralizada(mensagem):
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background-color: black;
+        background-color: rgba(0, 0, 0, 0.85);
         color: white;
-        padding: 16px 32px;
-        border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        font-weight: bold;
-        font-size: 1.2rem;
+        padding: 12px 24px;
+        border-radius: 40px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        font-weight: 500;
+        font-size: 1rem;
+        letter-spacing: 0.3px;
         z-index: 9999;
         text-align: center;
+        white-space: nowrap;
+        backdrop-filter: blur(2px);
+        font-family: inherit;
         animation: fadeOutUp 0.5s ease-in-out 2.5s forwards;
     ">
         {mensagem}
