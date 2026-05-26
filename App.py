@@ -45,7 +45,12 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
 # Função para mensagem centralizada (com quebra controlada)
 # ------------------------------
 def exibir_mensagem_centralizada(mensagem, quebrar_linha=False):
+    """
+    Exibe mensagem com a mesma formatação do st.success, centralizada,
+    com animação de subir e desaparecer em 3 segundos.
+    """
     msg_id = f"msg_{uuid.uuid4().hex}"
+
     style_base = """
         position: fixed;
         top: 50%;
@@ -64,6 +69,7 @@ def exibir_mensagem_centralizada(mensagem, quebrar_linha=False):
         font-family: inherit;
         animation: fadeOutUp 0.5s ease-in-out 2.5s forwards;
     """
+
     if quebrar_linha and '<br>' in mensagem:
         partes = mensagem.split('<br>', 1)
         primeira = partes[0].strip()
@@ -78,15 +84,24 @@ def exibir_mensagem_centralizada(mensagem, quebrar_linha=False):
     else:
         conteudo_html = f'✅ {mensagem}'
         style_extra = "white-space: nowrap;"
+
     style_completo = style_base + style_extra
+
     html = f"""
     <div id="{msg_id}" style="{style_completo}">
         {conteudo_html}
     </div>
     <style>
         @keyframes fadeOutUp {{
-            0% {{ opacity: 1; transform: translate(-50%, -50%); }}
-            100% {{ opacity: 0; transform: translate(-50%, -80%); visibility: hidden; }}
+            0% {{
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }}
+            100% {{
+                opacity: 0;
+                transform: translate(-50%, -80%);
+                visibility: hidden;
+            }}
         }}
     </style>
     <script>
@@ -108,6 +123,7 @@ def conectar_planilha():
     client = gspread.authorize(creds)
     sheet_id = "1HoN-VLyO5y9wJ4NKdpz42-BljRzT4VeJVY-Wio4CO6g"
     sheet = client.open_by_key(sheet_id).sheet1
+
     colunas_corretas = ["registro", "camara", "camara-vaga", "produto-marca", "produto-descricao", "validade"]
     header = sheet.row_values(1)
     if not header:
@@ -240,10 +256,10 @@ if st.session_state.check_consulta:
     st.markdown("---")
 
 # ------------------------------
-# 1. Seleção de câmara e vaga (exibida apenas se NÃO estiver consultando)
+# 1. Cadastro de Palete (exibido apenas se NÃO estiver consultando)
 # ------------------------------
 if not st.session_state.check_consulta:
-    st.subheader("📍 Localização do Palete")
+    st.markdown("## 📦 Cadastro de Palete")
     camaras = ["Resfriados 1", "Resfriados 2", "Congelados 1", "Congelados 2"]
     camara_opts = ["Selecione a câmara"] + camaras
     vagas = [
