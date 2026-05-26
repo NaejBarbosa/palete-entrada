@@ -211,6 +211,62 @@ sheet = conectar_planilha()
 df_existente = carregar_dados_existentes(sheet)
 
 # ------------------------------
+# NOVA SEÇÃO: Consulta de registros existentes
+# ------------------------------
+st.checkbox("📋 Consultar registros existentes", key="check_consulta")
+
+if st.session_state.check_consulta:
+    st.markdown("---")
+    camaras = ["Resfriados 1", "Resfriados 2", "Congelados 1", "Congelados 2"]
+    vagas = [
+        "A10D","A10E","A11D","A11E","A12D","A12E","A13D","A13E",
+        "A20D","A20E","A21D","A21E","A22D","A22E","A23D","A23E",
+        "A30D","A30E","A31D","A31E","A32D","A32E","A33D","A33E",
+        "A40D","A40E","A41D","A41E","A42D","A42E","A43D","A43E",
+        "A50D","A50E","A51D","A51E","A52D","A52E","A53D","A53E",
+        "B10D","B10E","B11D","B11E","B12D","B12E","B13D","B13E",
+        "B20D","B20E","B21D","B21E","B22D","B22E","B23D","B23E",
+        "B30D","B30E","B31D","B31E","B32D","B32E","B33D","B33E",
+        "B40D","B40E","B41D","B41E","B42D","B42E","B43D","B43E",
+        "B50D","B50E","B51D","B51E","B52D","B52E","B53D","B53E"
+    ]
+
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        filtro_camara = st.selectbox("Câmara", ["Todas"] + camaras, key="filtro_camara")
+    with col_f2:
+        filtro_vaga = st.selectbox("Vaga", ["Todas"] + vagas, key="filtro_vaga")
+    filtro_texto = st.text_input("Buscar em marca/descrição", key="filtro_texto")
+
+    # Aplicar filtros
+    df_filtrado = df_existente.copy()
+    if filtro_camara != "Todas":
+        df_filtrado = df_filtrado[df_filtrado['camara'] == filtro_camara]
+    if filtro_vaga != "Todas":
+        df_filtrado = df_filtrado[df_filtrado['camara-vaga'] == filtro_vaga]
+    if filtro_texto:
+        texto = filtro_texto.lower()
+        df_filtrado = df_filtrado[
+            df_filtrado['produto-marca'].str.lower().str.contains(texto, na=False) |
+            df_filtrado['produto-descricao'].str.lower().str.contains(texto, na=False)
+        ]
+
+    # Exibir no mesmo estilo da vaga ocupada
+    if filtro_camara != "Todas" and filtro_vaga != "Todas":
+        st.write(f"**Registros encontrados para {filtro_camara} / {filtro_vaga}:**")
+        if not df_filtrado.empty:
+            st.dataframe(df_filtrado[['registro', 'produto-marca', 'produto-descricao', 'validade']], use_container_width=True)
+        else:
+            st.info("Nenhum registro encontrado para esta combinação.")
+    else:
+        st.write(f"**Registros encontrados: {len(df_filtrado)}**")
+        if not df_filtrado.empty:
+            st.dataframe(df_filtrado[['registro', 'camara', 'camara-vaga', 'produto-marca', 'produto-descricao', 'validade']], use_container_width=True)
+        else:
+            st.info("Nenhum registro corresponde aos filtros.")
+    st.markdown("---")
+
+# ------------------------------
 # 1. Seleção de câmara e vaga
 # ------------------------------
 st.subheader("📍 Localização do Palete")
