@@ -42,10 +42,15 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
 """, unsafe_allow_html=True)
 
 # ------------------------------
-# Função para mensagem centralizada
+# Função para mensagem centralizada (com quebra controlada)
 # ------------------------------
 def exibir_mensagem_centralizada(mensagem, quebrar_linha=False):
+    """
+    Exibe mensagem com a mesma formatação do st.success, centralizada,
+    com animação de subir e desaparecer em 3 segundos.
+    """
     msg_id = f"msg_{uuid.uuid4().hex}"
+
     style_base = """
         position: fixed;
         top: 50%;
@@ -64,6 +69,7 @@ def exibir_mensagem_centralizada(mensagem, quebrar_linha=False):
         font-family: inherit;
         animation: fadeOutUp 0.5s ease-in-out 2.5s forwards;
     """
+
     if quebrar_linha and '<br>' in mensagem:
         partes = mensagem.split('<br>', 1)
         primeira = partes[0].strip()
@@ -78,15 +84,24 @@ def exibir_mensagem_centralizada(mensagem, quebrar_linha=False):
     else:
         conteudo_html = f'✅ {mensagem}'
         style_extra = "white-space: nowrap;"
+
     style_completo = style_base + style_extra
+
     html = f"""
     <div id="{msg_id}" style="{style_completo}">
         {conteudo_html}
     </div>
     <style>
         @keyframes fadeOutUp {{
-            0% {{ opacity: 1; transform: translate(-50%, -50%); }}
-            100% {{ opacity: 0; transform: translate(-50%, -80%); visibility: hidden; }}
+            0% {{
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }}
+            100% {{
+                opacity: 0;
+                transform: translate(-50%, -80%);
+                visibility: hidden;
+            }}
         }}
     </style>
     <script>
@@ -180,22 +195,12 @@ if 'bloqueado' not in st.session_state:
     st.session_state.bloqueado = False
 if 'exibir_gerenciamento' not in st.session_state:
     st.session_state.exibir_gerenciamento = False
-if 'edit_index' not in st.session_state:
-    st.session_state.edit_index = None
-
-# Opções de marca globais
-MARCA_OPCOES = [
-    "", "Seara", "Seara | Doriana", "Seara | Primor", "Seara | Excelsior",
-    "Seara | Macedo", "Seara | Rezende (pizza)", "Lar", "BRF | Perdigão",
-    "BRF | Sadia", "BRF | Claybom", "BRF | Qualy", "BRF | Becel",
-    "Aurora", "Aurora | Peperi", "Aurora | Nobre", "Outro"
-]
 
 sheet = conectar_planilha()
 df_existente = carregar_dados_existentes(sheet)
 
 # ------------------------------
-# Consulta de registros existentes
+# NOVA SEÇÃO: Consulta de registros existentes
 # ------------------------------
 st.checkbox("📋 Consultar registros existentes", key="check_consulta")
 
@@ -222,6 +227,7 @@ if st.session_state.check_consulta:
         filtro_vaga = st.selectbox("Vaga", ["Todas"] + vagas, key="filtro_vaga")
     filtro_texto = st.text_input("Buscar em marca/descrição", key="filtro_texto")
 
+    # Aplicar filtros
     df_filtrado = df_existente.copy()
     if filtro_camara != "Todas":
         df_filtrado = df_filtrado[df_filtrado['camara'] == filtro_camara]
@@ -234,6 +240,7 @@ if st.session_state.check_consulta:
             df_filtrado['produto-descricao'].str.lower().str.contains(texto, na=False)
         ]
 
+    # Exibir no mesmo estilo da vaga ocupada
     if filtro_camara != "Todas" and filtro_vaga != "Todas":
         st.write(f"**Registros encontrados para {filtro_camara} / {filtro_vaga}:**")
         if not df_filtrado.empty:
@@ -249,7 +256,7 @@ if st.session_state.check_consulta:
     st.markdown("---")
 
 # ------------------------------
-# 1. Cadastro de Palete
+# 1. Cadastro de Palete (exibido apenas se NÃO estiver consultando)
 # ------------------------------
 if not st.session_state.check_consulta:
     st.markdown("## 📦 Cadastro de Palete")
@@ -337,7 +344,13 @@ if not st.session_state.check_consulta:
         st.subheader("📦 Produtos no Palete")
 
         with st.form(key="produto_form", clear_on_submit=True):
-            marca = st.selectbox("Produto / Marca", MARCA_OPCOES, index=0)
+            marca_opcoes = [
+                "", "Seara", "Seara | Doriana", "Seara | Primor", "Seara | Excelsior",
+                "Seara | Macedo", "Seara | Rezende (pizza)", "Lar", "BRF | Perdigão",
+                "BRF | Sadia", "BRF | Claybom", "BRF | Qualy", "BRF | Becel",
+                "Aurora", "Aurora | Peperi", "Aurora | Nobre", "Outro"
+            ]
+            marca = st.selectbox("Produto / Marca", marca_opcoes, index=0)
             descricao = st.text_input("Descrição do produto (ex.: Peito de frango, 1kg)")
             data_validade = st.date_input(
                 "Validade", 
@@ -361,67 +374,12 @@ if not st.session_state.check_consulta:
                         "produto-descricao": descricao,
                         "validade": validade_str
                     })
-                    st.rerun()  # para limpar o formulário e exibir a lista atualizada
 
-        # Lista de produtos com opções de editar/excluir
         if st.session_state.produtos_temp:
             st.write("**Produtos neste palete:**")
-            for i, p in enumerate(st.session_state.produtos_temp):
-                col_info, col_edit, col_del = st.columns([5, 1, 1])
-                with col_info:
-                    st.write(f"{i+1}. {p['produto-marca']} - {p['produto-descricao']} (val.: {p['validade']})")
-                with col_edit:
-                    if st.button("✏️", key=f"edit_{i}", help="Editar este produto"):
-                        st.session_state.edit_index = i
-                        st.rerun()
-                with col_del:
-                    if st.button("🗑️", key=f"del_{i}", help="Remover este produto"):
-                        del st.session_state.produtos_temp[i]
-                        st.session_state.edit_index = None
-                        st.rerun()
+            for i, p in enumerate(st.session_state.produtos_temp, 1):
+                st.write(f"{i}. {p['produto-marca']} - {p['produto-descricao']} (val.: {p['validade']})")
 
-            # Formulário de edição (aparece logo abaixo da lista)
-            if st.session_state.edit_index is not None:
-                idx = st.session_state.edit_index
-                if 0 <= idx < len(st.session_state.produtos_temp):
-                    prod_edit = st.session_state.produtos_temp[idx]
-                    st.markdown("---")
-                    st.subheader("✏️ Editar produto")
-                    with st.form(key="edit_form"):
-                        # Encontrar índice da marca atual
-                        try:
-                            marca_idx = MARCA_OPCOES.index(prod_edit['produto-marca'])
-                        except ValueError:
-                            marca_idx = 0  # fallback
-
-                        nova_marca = st.selectbox("Produto / Marca", MARCA_OPCOES, index=marca_idx)
-                        nova_desc = st.text_input("Descrição do produto", value=prod_edit['produto-descricao'])
-                        # Converter string de data para date
-                        try:
-                            data_atual = datetime.strptime(prod_edit['validade'], "%d/%m/%Y").date()
-                        except:
-                            data_atual = datetime.now().date()
-                        nova_validade = st.date_input("Validade", value=data_atual, format="DD/MM/YYYY")
-                        
-                        col_salvar, col_cancelar = st.columns(2)
-                        with col_salvar:
-                            salvar_edit = st.form_submit_button("💾 Salvar alterações")
-                        with col_cancelar:
-                            cancelar_edit = st.form_submit_button("❌ Cancelar")
-                        
-                        if salvar_edit:
-                            st.session_state.produtos_temp[idx] = {
-                                "produto-marca": nova_marca,
-                                "produto-descricao": nova_desc,
-                                "validade": nova_validade.strftime("%d/%m/%Y")
-                            }
-                            st.session_state.edit_index = None
-                            st.rerun()
-                        elif cancelar_edit:
-                            st.session_state.edit_index = None
-                            st.rerun()
-
-            # Botões de ação do palete
             col1, col2, col3 = st.columns(3)
             with col1:
                 if st.button("➕ Adicionar mais", use_container_width=True, type="secondary"):
@@ -449,4 +407,12 @@ if not st.session_state.check_consulta:
                     except Exception as e:
                         st.error(f"Erro ao salvar: {e}")
             with col3:
-                if st.button("🗑️ Cancelar palete", use_container_width=True, typ
+                if st.button("🗑️ Cancelar palete", use_container_width=True, type="secondary"):
+                    st.session_state.produtos_temp = []
+                    st.session_state.camara = None
+                    st.session_state.vaga = None
+                    st.session_state.bloqueado = False
+                    force_reset()
+    else:
+        if st.session_state.bloqueado and not st.session_state.exibir_gerenciamento:
+            st.info("🔁 Altere a câmara ou vaga para uma combinação livre.")
