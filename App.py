@@ -2,7 +2,7 @@ import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime
 import pytz
 import time
 import uuid
@@ -14,7 +14,7 @@ st.set_page_config(page_title="Registro de Paletes", layout="centered")
 st.title("❄️ Entrada de Paletes | Perecíveis")
 
 # ------------------------------
-# CSS mínimo (aparência + botões discretos)
+# CSS mínimo (apenas aparência, sem scroll)
 # ------------------------------
 st.markdown("""
 <style>
@@ -38,23 +38,6 @@ div[data-testid="column"] button[kind="primaryFormSubmit"]:has(> div > p:contain
     background-color: #218838 !important;
     border-color: #1e7e34 !important;
 }
-/* Botões discretos de editar/excluir */
-div[data-testid="column"] button:has(> div > p:contains("✏️")),
-div[data-testid="column"] button:has(> div > p:contains("🗑️")) {
-    background-color: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    opacity: 0.6;
-    transition: opacity 0.2s ease;
-    padding: 0 8px !important;
-    min-width: 40px !important;
-}
-div[data-testid="column"] button:has(> div > p:contains("✏️")):hover,
-div[data-testid="column"] button:has(> div > p:contains("🗑️")):hover {
-    opacity: 1;
-    background-color: transparent !important;
-    cursor: pointer;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -62,7 +45,12 @@ div[data-testid="column"] button:has(> div > p:contains("🗑️")):hover {
 # Função para mensagem centralizada (com quebra controlada)
 # ------------------------------
 def exibir_mensagem_centralizada(mensagem, quebrar_linha=False):
+    """
+    Exibe mensagem com a mesma formatação do st.success, centralizada,
+    com animação de subir e desaparecer em 3 segundos.
+    """
     msg_id = f"msg_{uuid.uuid4().hex}"
+
     style_base = """
         position: fixed;
         top: 50%;
@@ -81,6 +69,7 @@ def exibir_mensagem_centralizada(mensagem, quebrar_linha=False):
         font-family: inherit;
         animation: fadeOutUp 0.5s ease-in-out 2.5s forwards;
     """
+
     if quebrar_linha and '<br>' in mensagem:
         partes = mensagem.split('<br>', 1)
         primeira = partes[0].strip()
@@ -97,6 +86,7 @@ def exibir_mensagem_centralizada(mensagem, quebrar_linha=False):
         style_extra = "white-space: nowrap;"
 
     style_completo = style_base + style_extra
+
     html = f"""
     <div id="{msg_id}" style="{style_completo}">
         {conteudo_html}
@@ -206,12 +196,6 @@ if 'bloqueado' not in st.session_state:
 if 'exibir_gerenciamento' not in st.session_state:
     st.session_state.exibir_gerenciamento = False
 
-# Estado para controle de edição
-if 'edit_index' not in st.session_state:
-    st.session_state.edit_index = None
-if 'edit_data' not in st.session_state:
-    st.session_state.edit_data = None
-
 sheet = conectar_planilha()
 df_existente = carregar_dados_existentes(sheet)
 
@@ -243,6 +227,7 @@ if st.session_state.check_consulta:
         filtro_vaga = st.selectbox("Vaga", ["Todas"] + vagas, key="filtro_vaga")
     filtro_texto = st.text_input("Buscar em marca/descrição", key="filtro_texto")
 
+    # Aplicar filtros
     df_filtrado = df_existente.copy()
     if filtro_camara != "Todas":
         df_filtrado = df_filtrado[df_filtrado['camara'] == filtro_camara]
@@ -255,6 +240,7 @@ if st.session_state.check_consulta:
             df_filtrado['produto-descricao'].str.lower().str.contains(texto, na=False)
         ]
 
+    # Exibir no mesmo estilo da vaga ocupada
     if filtro_camara != "Todas" and filtro_vaga != "Todas":
         st.write(f"**Registros encontrados para {filtro_camara} / {filtro_vaga}:**")
         if not df_filtrado.empty:
@@ -357,30 +343,18 @@ if not st.session_state.check_consulta:
     if not st.session_state.bloqueado and st.session_state.camara and st.session_state.vaga:
         st.subheader("📦 Produtos no Palete")
 
-        # --- Formulário de adição/edição de produto ---
-        with st.form(key="produto_form", clear_on_submit=False):
+        with st.form(key="produto_form", clear_on_submit=True):
             marca_opcoes = [
                 "", "Seara", "Seara | Doriana", "Seara | Primor", "Seara | Excelsior",
                 "Seara | Macedo", "Seara | Rezende (pizza)", "Lar", "BRF | Perdigão",
                 "BRF | Sadia", "BRF | Claybom", "BRF | Qualy", "BRF | Becel",
                 "Aurora", "Aurora | Peperi", "Aurora | Nobre", "Outro"
             ]
-
-            # Valores iniciais para os campos (se estiver editando)
-            initial_marca = st.session_state.edit_data['produto-marca'] if st.session_state.edit_data else ""
-            initial_desc = st.session_state.edit_data['produto-descricao'] if st.session_state.edit_data else ""
-            initial_validade = None
-            if st.session_state.edit_data:
-                try:
-                    initial_validade = datetime.strptime(st.session_state.edit_data['validade'], "%d/%m/%Y").date()
-                except:
-                    initial_validade = None
-
-            marca = st.selectbox("Produto / Marca", marca_opcoes, index=marca_opcoes.index(initial_marca) if initial_marca in marca_opcoes else 0)
-            descricao = st.text_input("Descrição do produto (ex.: Peito de frango, 1kg)", value=initial_desc)
+            marca = st.selectbox("Produto / Marca", marca_opcoes, index=0)
+            descricao = st.text_input("Descrição do produto (ex.: Peito de frango, 1kg)")
             data_validade = st.date_input(
-                "Validade",
-                value=initial_validade,
+                "Validade", 
+                value=None, 
                 format="DD/MM/YYYY",
                 help="Selecione a data no calendário"
             )
@@ -395,47 +369,17 @@ if not st.session_state.check_consulta:
                     st.error("Por favor, informe a descrição do produto.")
                 else:
                     validade_str = data_validade.strftime("%d/%m/%Y")
-                    novo_produto = {
+                    st.session_state.produtos_temp.append({
                         "produto-marca": marca,
                         "produto-descricao": descricao,
                         "validade": validade_str
-                    }
+                    })
 
-                    # Se estiver em modo edição, remove o produto antigo
-                    if st.session_state.edit_index is not None:
-                        del st.session_state.produtos_temp[st.session_state.edit_index]
-                        st.session_state.edit_index = None
-                        st.session_state.edit_data = None
-
-                    st.session_state.produtos_temp.append(novo_produto)
-                    # Limpa o formulário forçando rerun (o clear_on_submit não funciona com valores iniciais)
-                    st.rerun()
-
-        # --- Lista de produtos temporários com botões de editar/excluir ---
         if st.session_state.produtos_temp:
             st.write("**Produtos neste palete:**")
-            for i, p in enumerate(st.session_state.produtos_temp):
-                col_desc, col_edit, col_del = st.columns([6, 1, 1])
-                with col_desc:
-                    st.write(f"{i+1}. {p['produto-marca']} - {p['produto-descricao']} (val.: {p['validade']})")
-                with col_edit:
-                    if st.button("✏️", key=f"edit_{i}", help="Editar produto"):
-                        # Carrega dados para edição e remove da lista temporariamente
-                        st.session_state.edit_index = i
-                        st.session_state.edit_data = p.copy()
-                        st.rerun()
-                with col_del:
-                    if st.button("🗑️", key=f"del_{i}", help="Excluir produto"):
-                        del st.session_state.produtos_temp[i]
-                        # Se o produto excluído estava sendo editado, limpa o modo edição
-                        if st.session_state.edit_index == i:
-                            st.session_state.edit_index = None
-                            st.session_state.edit_data = None
-                        elif st.session_state.edit_index is not None and st.session_state.edit_index > i:
-                            st.session_state.edit_index -= 1
-                        st.rerun()
+            for i, p in enumerate(st.session_state.produtos_temp, 1):
+                st.write(f"{i}. {p['produto-marca']} - {p['produto-descricao']} (val.: {p['validade']})")
 
-            # Botões de ação global (Finalizar, Cancelar, Adicionar mais)
             col1, col2, col3 = st.columns(3)
             with col1:
                 if st.button("➕ Adicionar mais", use_container_width=True, type="secondary"):
@@ -455,4 +399,20 @@ if not st.session_state.check_consulta:
                         salvar_registros(sheet, registros_para_gravar)
                         exibir_mensagem_centralizada(f"{len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
                         time.sleep(3)
-                     
+                        st.session_state.produtos_temp = []
+                        st.session_state.camara = None
+                        st.session_state.vaga = None
+                        st.session_state.bloqueado = False
+                        force_reset()
+                    except Exception as e:
+                        st.error(f"Erro ao salvar: {e}")
+            with col3:
+                if st.button("🗑️ Cancelar palete", use_container_width=True, type="secondary"):
+                    st.session_state.produtos_temp = []
+                    st.session_state.camara = None
+                    st.session_state.vaga = None
+                    st.session_state.bloqueado = False
+                    force_reset()
+    else:
+        if st.session_state.bloqueado and not st.session_state.exibir_gerenciamento:
+            st.info("🔁 Altere a câmara ou vaga para uma combinação livre.")
