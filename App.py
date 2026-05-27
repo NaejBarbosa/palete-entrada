@@ -439,7 +439,6 @@ if not st.session_state.check_consulta:
             col1, col2, col3 = st.columns(3)
             with col1:
                 if st.button("➕ Adicionar mais", use_container_width=True, type="secondary"):
-                    # Apenas recarrega a página (já está no modo normal)
                     st.rerun()
             with col2:
                 if st.button("Finalizar e enviar", use_container_width=True, type="primary", key="finalizar_button"):
@@ -454,4 +453,6 @@ if not st.session_state.check_consulta:
                         })
                     try:
                         salvar_registros(sheet, registros_para_gravar)
-                        exibir_mensagem_centralizada(f"{len(registros_para_gravar)} produto(s) registrado(s) c
+                        exibir_mensagem_centralizada(f"{len(registros_para_gravar)} produto(s) registrado(s) com sucesso!")
+                        time.sleep(3)
+                     
